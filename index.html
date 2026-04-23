@@ -90,10 +90,6 @@
             cursor: pointer;
         }
 
-        .config-group select:hover, .config-group input:hover {
-            background: #3a3a3a;
-        }
-
         .button-panel {
             background: #1e1e1e;
             padding: 15px 20px;
@@ -167,12 +163,12 @@
         }
 
         .score-area {
-            background: #9e9e9e;
+            background: #4a4a4a;
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 25px;
             text-align: center;
-            border: 1px solid #757575;
+            border: 1px solid #666;
         }
 
         #notation-canvas {
@@ -191,36 +187,42 @@
             display: none;
         }
 
+        .virtual-piano h4 {
+            color: #3a6ea5;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
         .piano-keys {
             display: flex;
             justify-content: center;
-            gap: 2px;
+            gap: 1px;
             margin: 15px 0;
             position: relative;
             flex-wrap: wrap;
-            max-height: 200px;
+            max-height: 180px;
             overflow-y: auto;
         }
 
         .piano-key {
-            width: 40px;
-            height: 120px;
+            width: 32px;
+            height: 100px;
             background: white;
             border: 1px solid #333;
-            border-radius: 0 0 5px 5px;
+            border-radius: 0 0 3px 3px;
             cursor: pointer;
             transition: all 0.1s;
             position: relative;
             z-index: 0;
-            font-size: 10px;
+            font-size: 8px;
         }
 
         .piano-key.black {
-            width: 28px;
-            height: 70px;
+            width: 22px;
+            height: 60px;
             background: #333;
-            margin-left: -14px;
-            margin-right: -14px;
+            margin-left: -11px;
+            margin-right: -11px;
             z-index: 1;
             color: white;
         }
@@ -250,6 +252,12 @@
 
         .duration-btn.active {
             background: #3a6ea5;
+        }
+
+        .shortcut-hint {
+            font-size: 10px;
+            color: #9a9a9a;
+            margin-left: 5px;
         }
 
         .notes-list {
@@ -391,14 +399,14 @@
 
         @media (max-width: 768px) {
             .piano-key {
-                width: 30px;
-                height: 90px;
+                width: 28px;
+                height: 80px;
             }
             .piano-key.black {
-                width: 20px;
-                height: 55px;
-                margin-left: -10px;
-                margin-right: -10px;
+                width: 18px;
+                height: 50px;
+                margin-left: -9px;
+                margin-right: -9px;
             }
             .alternatives {
                 grid-template-columns: 1fr;
@@ -456,12 +464,12 @@
         </div>
 
         <div class="virtual-piano" id="virtual-piano">
-            <h4>🎹 Clique nas notas para construir seu contraponto (extensão C2 a C6):</h4>
+            <h4>🎹 Clique nas notas para construir seu contraponto (dó central = C3)</h4>
             <div class="duration-controls">
-                <button class="duration-btn" data-duration="w">𝅜 Semibreve</button>
-                <button class="duration-btn" data-duration="h">𝅗𝅥 Mínima</button>
-                <button class="duration-btn" data-duration="q">♩ Semínima</button>
-                <button class="duration-btn" data-duration="8">♪ Colcheia</button>
+                <button class="duration-btn" data-duration="w">𝅜 Semibreve <span class="shortcut-hint">(1)</span></button>
+                <button class="duration-btn" data-duration="h">𝅗𝅥 Mínima <span class="shortcut-hint">(2)</span></button>
+                <button class="duration-btn" data-duration="q">♩ Semínima <span class="shortcut-hint">(4)</span></button>
+                <button class="duration-btn" data-duration="8">♪ Colcheia <span class="shortcut-hint">(8)</span></button>
             </div>
             <div class="piano-keys" id="piano-keys"></div>
             
@@ -507,7 +515,15 @@
         5: ['A - Nota de passagem', 'B - Bordadura', 'C - Cambiata', 'D - Bordadura dupla', 'E - Grupo de notas de passagem', 'F - Nota de passagem acentuada', 'G - Bordadura acentuada', 'H - Suspensão e retardo', 'I - Suspensão com resolução interrompida', 'J - Apojatura', 'K - Antecipação']
     };
 
-    // Mapeamento de armaduras de clave para o formato VexFlow
+    // Intervalos consonantes
+    const INTERVALOS_CONSONANTES = [0, 3, 4, 7, 8]; // uníssono, 3ª, 4ª, 5ª, 6ª, 8ª (em semitons)
+    
+    function isConsonante(intervaloSemitons) {
+        const mod = Math.abs(intervaloSemitons) % 12;
+        return [0, 3, 4, 7, 8, 9].includes(mod);
+    }
+
+    // Mapeamento de armaduras
     function getKeySignatureString(tonalityName) {
         const map = {
             'C Maior': 'C',
@@ -521,10 +537,30 @@
         return map[tonalityName] || 'C';
     }
 
+    // Conversão de nota para número (para cálculos de intervalo)
+    function noteToNumber(noteWithOctave) {
+        const notes = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
+        const [note, octave] = noteWithOctave.split('/');
+        const noteIndex = notes.indexOf(note);
+        return (parseInt(octave) + 1) * 12 + noteIndex;
+    }
+
+    function numberToNote(num) {
+        const notes = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
+        const octave = Math.floor(num / 12) - 1;
+        const noteIndex = num % 12;
+        return notes[noteIndex] + '/' + octave;
+    }
+
     let currentSpecies = 2;
     let currentTonality = 'C';
     let currentTonalityName = '';
     let currentScale = [];
+    let currentScaleNumbers = [];
+    let currentCantusPosition = 'superior';
+    let currentCantusClef = 'treble';
+    let currentCantusNotes = [];
+    let currentContrapontoNotes = [];
     let questions = [];
     let currentQuestionIndex = 0;
     let userAnswers = [];
@@ -574,14 +610,14 @@
             const tonic = majors[Math.floor(Math.random() * majors.length)];
             currentTonality = tonic;
             currentTonalityName = `${tonic} Maior`;
-            currentScale = generateMajorScale(tonic);
+            generateMajorScale(tonic);
             return currentTonalityName;
         } else {
             const minors = ['A', 'E', 'D'];
             const tonic = minors[Math.floor(Math.random() * minors.length)];
             currentTonality = tonic;
             currentTonalityName = `${tonic} Menor`;
-            currentScale = generateMinorScale(tonic);
+            generateMinorScale(tonic);
             return currentTonalityName;
         }
     }
@@ -592,7 +628,12 @@
         const intervals = [0, 2, 4, 5, 7, 9, 11];
         const startIndex = notes.indexOf(tonic);
         const scaleNotes = intervals.map(interval => notes[(startIndex + interval) % 12]);
-        return scaleNotes.map(n => notesMap[n] || n.toLowerCase());
+        currentScale = scaleNotes.map(n => notesMap[n] || n.toLowerCase());
+        currentScaleNumbers = currentScale.map(note => {
+            const octave = 4;
+            const notesIdx = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'].indexOf(note);
+            return (octave + 1) * 12 + notesIdx;
+        });
     }
 
     function generateMinorScale(tonic) {
@@ -601,56 +642,178 @@
         const intervals = [0, 2, 3, 5, 7, 8, 10];
         const startIndex = notes.indexOf(tonic);
         const scaleNotes = intervals.map(interval => notes[(startIndex + interval) % 12]);
-        return scaleNotes.map(n => notesMap[n] || n.toLowerCase());
+        currentScale = scaleNotes.map(n => notesMap[n] || n.toLowerCase());
+        currentScaleNumbers = currentScale.map(note => {
+            const octave = 4;
+            const notesIdx = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'].indexOf(note);
+            return (octave + 1) * 12 + notesIdx;
+        });
+    }
+
+    function getRandomScaleNote(minOctave, maxOctave) {
+        const noteName = currentScale[Math.floor(Math.random() * currentScale.length)];
+        const octave = minOctave + Math.floor(Math.random() * (maxOctave - minOctave + 1));
+        return noteName + '/' + octave;
+    }
+
+    function getScaleNoteAtInterval(baseNote, intervalSteps) {
+        const baseNum = noteToNumber(baseNote);
+        const scaleStep = currentScaleNumbers.indexOf(baseNum % 12);
+        if (scaleStep === -1) return null;
+        const targetStep = (scaleStep + intervalSteps + currentScale.length) % currentScale.length;
+        const targetNoteName = currentScale[targetStep];
+        const targetOctave = Math.floor(baseNum / 12) - 1 + Math.floor((scaleStep + intervalSteps) / currentScale.length);
+        return targetNoteName + '/' + targetOctave;
     }
 
     function generateCantusFirmus() {
-        const startNote = currentScale[0] + '/4';
-        const endNote = currentScale[Math.floor(Math.random() * currentScale.length)] + '/4';
-        const cf = [
+        currentCantusPosition = Math.random() < 0.5 ? 'superior' : 'inferior';
+        currentCantusClef = currentCantusPosition === 'superior' ? 'treble' : 'bass';
+        
+        let minOctave, maxOctave;
+        if (currentCantusPosition === 'superior') {
+            minOctave = 3;
+            maxOctave = 5;
+        } else {
+            minOctave = 2;
+            maxOctave = 4;
+        }
+        
+        let startNote, endNote;
+        let valid = false;
+        let attempts = 0;
+        
+        while (!valid && attempts < 50) {
+            startNote = getRandomScaleNote(minOctave, maxOctave);
+            const startNum = noteToNumber(startNote);
+            
+            let possibleEndNotes = [];
+            for (let i = 0; i < currentScale.length; i++) {
+                for (let oct = minOctave; oct <= maxOctave; oct++) {
+                    const endNum = (Math.floor(startNum / 12) - 1 + Math.floor(i / currentScale.length) + oct) * 12 + currentScaleNumbers[i % currentScale.length] % 12;
+                    const interval = Math.abs(endNum - startNum);
+                    if (interval >= 2 && interval <= 12 && interval !== 7) {
+                        if (currentCantusPosition === 'superior') {
+                            const endOctave = Math.floor(endNum / 12) - 1;
+                            if (endOctave >= 3 && endOctave <= 5) {
+                                possibleEndNotes.push(numberToNote(endNum));
+                            }
+                        } else {
+                            const endOctave = Math.floor(endNum / 12) - 1;
+                            if (endOctave >= 2 && endOctave <= 4) {
+                                possibleEndNotes.push(numberToNote(endNum));
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (possibleEndNotes.length > 0) {
+                endNote = possibleEndNotes[Math.floor(Math.random() * possibleEndNotes.length)];
+                valid = true;
+            }
+            attempts++;
+        }
+        
+        if (!valid) {
+            endNote = startNote;
+        }
+        
+        currentCantusNotes = [
             { note: startNote, duration: 'w' },
             { note: endNote, duration: 'w' }
         ];
-        console.log('DEBUG - Cantus Firmus gerado:', cf);
-        return cf;
+        
+        console.log('DEBUG - Cantus gerado:', currentCantusNotes, 'Posição:', currentCantusPosition);
+        return currentCantusNotes;
     }
 
-    function generateContraponto(species) {
-        const contraponto = [];
-        const primeiraNota = currentScale[2] + '/4';
-        const ultimaNota = currentScale[0] + '/4';
+    function gerarContraponto2aEspecie(tratamento, cantusNotes, posicaoCantus) {
+        const cantusNote1 = cantusNotes[0].note;
+        const cantusNote2 = cantusNotes[1].note;
+        const cantusNum1 = noteToNumber(cantusNote1);
+        const cantusNum2 = noteToNumber(cantusNote2);
         
-        if (species === 2) {
-            contraponto.push({ note: primeiraNota, duration: 'h' });
-            contraponto.push({ note: currentScale[3] + '/4', duration: 'h' });
-            contraponto.push({ note: currentScale[4] + '/4', duration: 'h' });
-            contraponto.push({ note: ultimaNota, duration: 'h' });
-        } else if (species === 3) {
-            contraponto.push({ note: primeiraNota, duration: 'q' });
-            contraponto.push({ note: currentScale[3] + '/4', duration: 'q' });
-            contraponto.push({ note: currentScale[4] + '/4', duration: 'q' });
-            contraponto.push({ note: currentScale[5] + '/4', duration: 'q' });
-            contraponto.push({ note: currentScale[0] + '/4', duration: 'q' });
-            contraponto.push({ note: currentScale[1] + '/4', duration: 'q' });
-            contraponto.push({ note: currentScale[2] + '/4', duration: 'q' });
-            contraponto.push({ note: ultimaNota, duration: 'q' });
-        } else if (species === 4) {
-            contraponto.push({ note: primeiraNota, duration: 'h' });
-            contraponto.push({ note: currentScale[3] + '/4', duration: 'h' });
-            contraponto.push({ note: currentScale[4] + '/4', duration: 'h' });
-            contraponto.push({ note: ultimaNota, duration: 'h' });
-        } else {
-            contraponto.push({ note: primeiraNota, duration: 'q' });
-            contraponto.push({ note: currentScale[3] + '/4', duration: '8' });
-            contraponto.push({ note: currentScale[4] + '/4', duration: '8' });
-            contraponto.push({ note: currentScale[5] + '/4', duration: 'q' });
-            contraponto.push({ note: currentScale[0] + '/4', duration: 'q' });
-            contraponto.push({ note: currentScale[1] + '/4', duration: '8' });
-            contraponto.push({ note: currentScale[2] + '/4', duration: '8' });
-            contraponto.push({ note: ultimaNota, duration: 'q' });
+        const isCantusSuperior = posicaoCantus === 'superior';
+        
+        let preparacao, dissonancia, resolucao;
+        let valid = false;
+        let attempts = 0;
+        
+        while (!valid && attempts < 100) {
+            if (tratamento === 'D - Sem Dissonâncias') {
+                const possiveisPreparacoes = [];
+                for (let i = -5; i <= 5; i++) {
+                    const interval = Math.abs((cantusNum1 + i) - cantusNum1);
+                    if (isConsonante(interval) && interval > 0) {
+                        const notaNum = cantusNum1 + i;
+                        const nota = numberToNote(notaNum);
+                        if (nota && Math.abs(i) <= 5) {
+                            possiveisPreparacoes.push(nota);
+                        }
+                    }
+                }
+                if (possiveisPreparacoes.length > 0) {
+                    preparacao = possiveisPreparacoes[Math.floor(Math.random() * possiveisPreparacoes.length)];
+                    dissonancia = preparacao;
+                    resolucao = getScaleNoteAtInterval(preparacao, Math.random() > 0.5 ? 1 : -1);
+                    if (resolucao) valid = true;
+                }
+            }
+            
+            if (tratamento === 'A - Nota de passagem') {
+                for (let dir of [1, -1]) {
+                    const degrau = getScaleNoteAtInterval(cantusNote1, dir);
+                    if (degrau) {
+                        const passo1 = getScaleNoteAtInterval(cantusNote1, dir);
+                        const passo2 = getScaleNoteAtInterval(passo1, dir);
+                        if (passo1 && passo2) {
+                            preparacao = cantusNote1;
+                            dissonancia = passo1;
+                            resolucao = passo2;
+                            valid = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (tratamento === 'B - Bordadura Inferior') {
+                const bordaduraNota = getScaleNoteAtInterval(cantusNote1, -1);
+                if (bordaduraNota) {
+                    preparacao = cantusNote1;
+                    dissonancia = bordaduraNota;
+                    resolucao = cantusNote1;
+                    valid = true;
+                }
+            }
+            
+            if (tratamento === 'C - Bordadura Superior') {
+                const bordaduraNota = getScaleNoteAtInterval(cantusNote1, 1);
+                if (bordaduraNota) {
+                    preparacao = cantusNote1;
+                    dissonancia = bordaduraNota;
+                    resolucao = cantusNote1;
+                    valid = true;
+                }
+            }
+            
+            attempts++;
         }
         
-        console.log('DEBUG - Contraponto gerado (espécie ' + species + '):', contraponto);
+        if (!valid) {
+            preparacao = cantusNote1;
+            dissonancia = cantusNote1;
+            resolucao = cantusNote2;
+        }
+        
+        const contraponto = [
+            { note: preparacao, duration: 'h' },
+            { note: dissonancia, duration: 'h' },
+            { note: resolucao, duration: 'w' }
+        ];
+        
+        console.log('DEBUG - Contraponto 2ª espécie gerado para', tratamento, ':', contraponto);
         return contraponto;
     }
 
@@ -661,7 +824,18 @@
         for (let i = 0; i < 4; i++) {
             const tratamento = tratamentos[i % tratamentos.length];
             const cantus = generateCantusFirmus();
-            const contraponto = generateContraponto(currentSpecies);
+            let contraponto;
+            
+            if (currentSpecies === 2) {
+                contraponto = gerarContraponto2aEspecie(tratamento, cantus, currentCantusPosition);
+            } else {
+                contraponto = [
+                    { note: currentScale[2] + '/4', duration: 'q' },
+                    { note: currentScale[3] + '/4', duration: 'q' },
+                    { note: currentScale[4] + '/4', duration: 'q' },
+                    { note: currentScale[0] + '/4', duration: 'w' }
+                ];
+            }
             
             tipoA.push({
                 id: `a${i}`,
@@ -670,7 +844,9 @@
                 tratamento: tratamento,
                 resposta: tratamento,
                 cantus: cantus,
-                contraponto: contraponto
+                contraponto: contraponto,
+                cantusPosition: currentCantusPosition,
+                cantusClef: currentCantusClef
             });
             tipoB.push({
                 id: `b${i}`,
@@ -678,7 +854,7 @@
                 enunciado: `Analise a partitura e classifique o tratamento de dissonância:`,
                 tratamento: tratamento,
                 resposta: tratamento,
-                partitura: { cantus: cantus, contraponto: contraponto }
+                partitura: { cantus: cantus, contraponto: contraponto, cantusPosition: currentCantusPosition, cantusClef: currentCantusClef }
             });
             tipoC.push({
                 id: `c${i}`,
@@ -687,6 +863,8 @@
                 tratamento: tratamento,
                 resposta: tratamento,
                 cantus: cantus,
+                cantusPosition: currentCantusPosition,
+                cantusClef: currentCantusClef,
                 contrapontoEsperado: [currentScale[2] + '/4']
             });
         }
@@ -715,16 +893,15 @@
             const noteSpan = document.createElement('span');
             noteSpan.className = 'note-item';
             const duracaoDisplay = nota.duration === 'w' ? '𝅜' : nota.duration === 'h' ? '𝅗𝅥' : nota.duration === 'q' ? '♩' : '♪';
-            noteSpan.innerHTML = `${duracaoDisplay} ${nota.note.replace('/4', '').toUpperCase()}`;
+            noteSpan.innerHTML = `${duracaoDisplay} ${nota.note.replace('/', '').toUpperCase()}`;
             noteSpan.title = 'Clique para remover esta nota';
             noteSpan.onclick = () => {
                 userContraponto.splice(index, 1);
                 updateNotesList();
                 const q = questions[currentQuestionIndex];
                 if (q && q.tipo === 'c') {
-                    drawScore(q.cantus, userContraponto);
+                    drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
                 }
-                console.log('DEBUG - Nota removida. Total:', userContraponto.length);
             };
             container.appendChild(noteSpan);
         });
@@ -735,12 +912,11 @@
         updateNotesList();
         const q = questions[currentQuestionIndex];
         if (q && q.tipo === 'c') {
-            drawScore(q.cantus, userContraponto);
+            drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
         }
-        console.log('DEBUG - Todas as notas removidas');
     }
 
-    function drawScore(cantus, contraponto) {
+    function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef = 'treble') {
         const canvas = document.getElementById('notation-canvas');
         if (!canvas) return;
 
@@ -799,6 +975,12 @@
             context.setStrokeStyle('#000000');
 
             const keySigString = getKeySignatureString(currentTonalityName);
+            
+            const yCantus = cantusPosition === 'superior' ? 30 : 150;
+            const yContraponto = cantusPosition === 'superior' ? 150 : 30;
+            const clefCantus = cantusClef;
+            const clefContraponto = cantusClef === 'treble' ? 'bass' : 'treble';
+
             const stavesC = [];
             const stavesCP = [];
 
@@ -810,9 +992,9 @@
                     xPos = MARGEM_ESQ + LARGURA_CLEF + (i * LARGURA_COMPASSO);
                 }
 
-                const sc = new Vex.Flow.Stave(xPos, 30, i === 0 ? LARGURA_CLEF + LARGURA_COMPASSO : LARGURA_COMPASSO);
+                const sc = new Vex.Flow.Stave(xPos, yCantus, i === 0 ? LARGURA_CLEF + LARGURA_COMPASSO : LARGURA_COMPASSO);
                 if (i === 0) {
-                    sc.addClef('treble');
+                    sc.addClef(clefCantus);
                     if (keySigString !== 'C') {
                         sc.addKeySignature(keySigString);
                     }
@@ -821,9 +1003,9 @@
                 sc.setContext(context).draw();
                 stavesC.push(sc);
 
-                const scp = new Vex.Flow.Stave(xPos, 150, i === 0 ? LARGURA_CLEF + LARGURA_COMPASSO : LARGURA_COMPASSO);
+                const scp = new Vex.Flow.Stave(xPos, yContraponto, i === 0 ? LARGURA_CLEF + LARGURA_COMPASSO : LARGURA_COMPASSO);
                 if (i === 0) {
-                    scp.addClef('treble');
+                    scp.addClef(clefContraponto);
                     if (keySigString !== 'C') {
                         scp.addKeySignature(keySigString);
                     }
@@ -872,7 +1054,7 @@
                 desenharVoz(staveNotesCP, stavesCP[i], temposCP);
             }
 
-            console.log('✅ Partitura desenhada com sucesso —', numCompassos, 'compasso(s)');
+            console.log('✅ Partitura desenhada com sucesso');
         } catch(e) {
             console.error('❌ Erro ao desenhar partitura:', e);
         }
@@ -942,14 +1124,14 @@
             updateNotesList();
             pianoDiv.style.display = 'block';
             answersDiv.classList.add('hidden');
-            drawScore(q.cantus, userContraponto);
+            drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
         } else {
             pianoDiv.style.display = 'none';
             answersDiv.classList.remove('hidden');
             if (q.tipo === 'b') {
-                drawScore(q.partitura.cantus, q.partitura.contraponto);
+                drawScore(q.partitura.cantus, q.partitura.contraponto, q.partitura.cantusPosition, q.partitura.cantusClef);
             } else if (q.tipo === 'a') {
-                drawScore([], []);
+                drawScore(q.cantus, q.contraponto, q.cantusPosition, q.cantusClef);
             }
         }
 
@@ -1132,20 +1314,42 @@
             key.style.alignItems = 'flex-end';
             key.style.justifyContent = 'center';
             key.style.paddingBottom = '5px';
-            key.style.fontSize = '9px';
-            key.innerHTML = `${note.replace('#', '♯')}${octave}`;
+            key.style.fontSize = '8px';
+            const displayNote = note.replace('#', '♯').toUpperCase();
+            key.innerHTML = `${displayNote}${octave}`;
             key.onclick = () => {
                 const q = questions[currentQuestionIndex];
                 if (q && q.tipo === 'c') {
                     userContraponto.push({ note: note + '/' + octave, duration: selectedDuration });
                     updateNotesList();
-                    drawScore(q.cantus, userContraponto);
+                    drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
                     console.log('DEBUG - Nota inserida:', note + '/' + octave, 'Duração:', selectedDuration);
                 }
             };
             container.appendChild(key);
         });
     }
+
+    // Atalhos de teclado para durações
+    document.addEventListener('keydown', (e) => {
+        const key = e.key;
+        const durationMap = {
+            '1': 'w',
+            '2': 'h',
+            '4': 'q',
+            '8': '8'
+        };
+        if (durationMap[key]) {
+            selectedDuration = durationMap[key];
+            document.querySelectorAll('.duration-btn').forEach(btn => {
+                if (btn.getAttribute('data-duration') === selectedDuration) {
+                    document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                }
+            });
+            e.preventDefault();
+        }
+    });
 
     document.querySelectorAll('.duration-btn').forEach(btn => {
         btn.onclick = () => {
@@ -1166,6 +1370,7 @@
     initPiano();
     
     console.log('✅ Sistema carregado. Aguardando início do exercício.');
+    console.log('💡 Atalhos de teclado: 1=Semibreve, 2=Mínima, 4=Semínima, 8=Colcheia');
 </script>
 </body>
 </html>
