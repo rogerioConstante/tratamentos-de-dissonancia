@@ -408,7 +408,7 @@
         </div>
 
         <div class="score-area">
-            <canvas id="notation-canvas" width="800" height="200"></canvas>
+            <canvas id="notation-canvas" width="800" height="280"></canvas>
         </div>
 
         <div class="virtual-piano" id="virtual-piano">
@@ -639,85 +639,171 @@
         return notas.reduce((total, nota) => total + (duracaoMap[nota.duration] || 0), 0);
     }
 
-    // Desenhar partitura com VexFlow (CORRIGIDO com debug)
+    // Desenhar partitura com VexFlow — Opção A: um Stave por compasso
     function drawScore(cantus, contraponto) {
         const canvas = document.getElementById('notation-canvas');
         if (!canvas) return;
-        
+
         try {
-            // DEBUG: Mostrar o que será desenhado
-            console.log('========== DEBUG DRAWSCORE ==========');
-            console.log('Cantus recebido:', JSON.stringify(cantus, null, 2));
-            console.log('Contraponto recebido:', JSON.stringify(contraponto, null, 2));
-            
-            const duracaoCantus = cantus ? calcularDuracaoTotal(cantus) : 0;
-            const duracaoContraponto = contraponto ? calcularDuracaoTotal(contraponto) : 0;
-            
-            console.log('Duração total Cantus (em tempos):', duracaoCantus);
-            console.log('Duração total Contraponto (em tempos):', duracaoContraponto);
-            console.log('=====================================');
-            
-            if (renderer) {
-                renderer.resize(800, 200);
-            } else {
-                renderer = new Vex.Flow.Renderer(canvas, Vex.Flow.Renderer.Backends.CANVAS);
-                renderer.resize(800, 200);
-                context = renderer.getContext();
+            const duracaoMap = { 'w': 4, 'h': 2, 'q': 1, '8': 0.5, '16': 0.25 };
+
+            // ---------------------------------------------------------
+            // 1. Distribuir notas em compassos de 4 tempos
+            // ---------------------------------------------------------
+            function distribuirEmCompassos(notas) {
+                const compassos = [];
+                let compasso = [];
+                let temposNoCompasso = 0;
+                const TEMPOS_POR_COMPASSO = 4;
+
+                (notas || []).forEach(n => {
+                    const dur = duracaoMap[n.duration] || 1;
+
+                    // Se a nota cabe inteira no compasso atual
+                    if (temposNoCompasso + dur <= TEMPOS_POR_COMPASSO + 0.001) {
+                        compasso.push(n);
+                        temposNoCompasso += dur;
+                        if (Math.abs(temposNoCompasso - TEMPOS_POR_COMPASSO) < 0.001) {
+                            compassos.push(compasso);
+                            compasso = [];
+                            temposNoCompasso = 0;
+                        }
+                    } else {
+                        // Fecha compasso atual com o que tem e abre novo
+                        if (compasso.length > 0) {
+                            compassos.push(compasso);
+                        }
+                        compasso = [n];
+                        temposNoCompasso = dur;
+                        if (Math.abs(temposNoCompasso - TEMPOS_POR_COMPASSO) < 0.001) {
+                            compassos.push(compasso);
+                            compasso = [];
+                            temposNoCompasso = 0;
+                        }
+                    }
+                });
+
+                // Compasso final incompleto (ex: contraponto do usuário ainda sendo construído)
+                if (compasso.length > 0) {
+                    compassos.push(compasso);
+                }
+
+                return compassos;
             }
-            
+
+            const compassosCantus      = distribuirEmCompassos(cantus);
+            const compassosContraponto = distribuirEmCompassos(contraponto);
+            const numCompassos = Math.max(compassosCantus.length, compassosContraponto.length, 1);
+
+            // ---------------------------------------------------------
+            // 2. Dimensionar canvas dinamicamente
+            // ---------------------------------------------------------
+            const LARGURA_CLEF    = 80;   // espaço para clave + fórmula de compasso
+            const LARGURA_COMPASSO = 220;  // largura de cada compasso
+            const MARGEM_ESQ      = 10;
+            const totalLargura    = MARGEM_ESQ + LARGURA_CLEF + (numCompassos * LARGURA_COMPASSO) + 20;
+            const totalAltura     = 280;  // duas pautas + margens
+
+            canvas.width  = totalLargura;
+            canvas.height = totalAltura;
+
+            // Recriar renderer para refletir novo tamanho
+            renderer = new Vex.Flow.Renderer(canvas, Vex.Flow.Renderer.Backends.CANVAS);
+            renderer.resize(totalLargura, totalAltura);
+            context = renderer.getContext();
             context.clear();
-            
-            // Criar dois staves: um para Cantus, um para Contraponto
-            const staveCantus = new Vex.Flow.Stave(10, 40, 750);
-            staveCantus.addClef('treble').addTimeSignature('4/4');
-            staveCantus.setContext(context).draw();
-            
-            const staveContraponto = new Vex.Flow.Stave(10, 120, 750);
-            staveContraponto.addClef('treble').addTimeSignature('4/4');
-            staveContraponto.setContext(context).draw();
-            
-            const notasCantus = [];
-            const notasContraponto = [];
-            
-            if (cantus && cantus.length > 0) {
-                cantus.forEach(n => {
+
+            // ---------------------------------------------------------
+            // 3. Criar e desenhar os Staves compasso a compasso
+            // ---------------------------------------------------------
+            const stavesC  = [];  // Cantus
+            const stavesCP = [];  // Contraponto
+
+            for (let i = 0; i < numCompassos; i++) {
+                const ehPrimeiro = (i === 0);
+                const xInicio    = MARGEM_ESQ + (ehPrimeiro ? 0 : LARGURA_CLEF) +
+                                   (i === 0 ? 0 : LARGURA_CLEF + (i - 1) * LARGURA_COMPASSO + LARGURA_COMPASSO);
+
+                // Recalcular x de forma mais clara:
+                let xPos;
+                if (i === 0) {
+                    xPos = MARGEM_ESQ;
+                } else {
+                    xPos = MARGEM_ESQ + LARGURA_CLEF + (i * LARGURA_COMPASSO);
+                }
+
+                const largura = ehPrimeiro ? LARGURA_CLEF + LARGURA_COMPASSO : LARGURA_COMPASSO;
+
+                // Pauta do Cantus (linha superior)
+                const sc = new Vex.Flow.Stave(xPos, 30, largura);
+                if (ehPrimeiro) {
+                    sc.addClef('treble').addTimeSignature('4/4');
+                }
+                sc.setContext(context).draw();
+                stavesC.push(sc);
+
+                // Pauta do Contraponto (linha inferior)
+                const scp = new Vex.Flow.Stave(xPos, 150, largura);
+                if (ehPrimeiro) {
+                    scp.addClef('treble').addTimeSignature('4/4');
+                }
+                scp.setContext(context).draw();
+                stavesCP.push(scp);
+            }
+
+            // Linha de sistema conectando os dois staves no início
+            const connector = new Vex.Flow.StaveConnector(stavesC[0], stavesCP[0]);
+            connector.setType(Vex.Flow.StaveConnector.type.SINGLE_LEFT);
+            connector.setContext(context).draw();
+
+            // ---------------------------------------------------------
+            // 4. Criar StaveNotes e desenhar cada compasso
+            // ---------------------------------------------------------
+            function criarStaveNotes(notasCompasso) {
+                return notasCompasso.map(n => {
                     try {
-                        const staveNote = new Vex.Flow.StaveNote({ keys: [n.note], duration: n.duration });
-                        notasCantus.push(staveNote);
+                        return new Vex.Flow.StaveNote({ keys: [n.note], duration: n.duration });
                     } catch(e) {
-                        console.warn('Erro ao criar nota cantus:', n, e);
+                        console.warn('Erro ao criar StaveNote:', n, e);
+                        return null;
                     }
-                });
+                }).filter(Boolean);
             }
-            
-            if (contraponto && contraponto.length > 0) {
-                contraponto.forEach(n => {
-                    try {
-                        const staveNote = new Vex.Flow.StaveNote({ keys: [n.note], duration: n.duration });
-                        notasContraponto.push(staveNote);
-                    } catch(e) {
-                        console.warn('Erro ao criar nota contraponto:', n, e);
-                    }
-                });
+
+            function desenharVoz(staveNotes, stave, temposReais) {
+                if (staveNotes.length === 0) return;
+
+                // Para compasso incompleto (usuário ainda digitando), usar modo não-estrito
+                const temposEsperados = 4;
+                const voice = new Vex.Flow.Voice({ num_beats: temposEsperados, note_value: 4 });
+                voice.setMode(
+                    Math.abs(temposReais - temposEsperados) < 0.001
+                        ? Vex.Flow.Voice.Mode.STRICT
+                        : Vex.Flow.Voice.Mode.SOFT
+                );
+                voice.addTickables(staveNotes);
+                new Vex.Flow.Formatter()
+                    .joinVoices([voice])
+                    .formatToStave([voice], stave);
+                voice.draw(context, stave);
             }
-            
-            // Desenhar Cantus
-            if (notasCantus.length > 0) {
-                const voiceCantus = new Vex.Flow.Voice({ num_beats: 4, note_value: 4 });
-                voiceCantus.addTickables(notasCantus);
-                new Vex.Flow.Formatter().joinVoices([voiceCantus]).formatToStave([voiceCantus], staveCantus);
-                voiceCantus.draw(context, staveCantus);
+
+            for (let i = 0; i < numCompassos; i++) {
+                // Cantus
+                const notasC = compassosCantus[i] || [];
+                const staveNotesC = criarStaveNotes(notasC);
+                const temposC = notasC.reduce((s, n) => s + (duracaoMap[n.duration] || 0), 0);
+                desenharVoz(staveNotesC, stavesC[i], temposC);
+
+                // Contraponto
+                const notasCP = compassosContraponto[i] || [];
+                const staveNotesCP = criarStaveNotes(notasCP);
+                const temposCP = notasCP.reduce((s, n) => s + (duracaoMap[n.duration] || 0), 0);
+                desenharVoz(staveNotesCP, stavesCP[i], temposCP);
             }
-            
-            // Desenhar Contraponto
-            if (notasContraponto.length > 0) {
-                const voiceContraponto = new Vex.Flow.Voice({ num_beats: 4, note_value: 4 });
-                voiceContraponto.addTickables(notasContraponto);
-                new Vex.Flow.Formatter().joinVoices([voiceContraponto]).formatToStave([voiceContraponto], staveContraponto);
-                voiceContraponto.draw(context, staveContraponto);
-            }
-            
-            console.log('✅ Partitura desenhada com sucesso');
+
+            console.log('✅ Partitura desenhada com sucesso —', numCompassos, 'compasso(s)');
+
         } catch(e) {
             console.error('❌ Erro ao desenhar partitura:', e);
         }
