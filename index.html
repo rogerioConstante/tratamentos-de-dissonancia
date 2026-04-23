@@ -330,6 +330,30 @@
             border-color: #4d8bc9;
         }
 
+        .feedback-toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #3a6ea5;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
         .report-area {
             margin-top: 30px;
             background: #1e1e1e;
@@ -464,7 +488,7 @@
         </div>
 
         <div class="virtual-piano" id="virtual-piano">
-            <h4>🎹 Clique nas notas para construir seu contraponto (dó central = C3)</h4>
+            <h4>🎹 Clique nas notas para construir seu contraponto (C3 = dó central)</h4>
             <div class="duration-controls">
                 <button class="duration-btn" data-duration="w">𝅜 Semibreve <span class="shortcut-hint">(1)</span></button>
                 <button class="duration-btn" data-duration="h">𝅗𝅥 Mínima <span class="shortcut-hint">(2)</span></button>
@@ -508,6 +532,30 @@
 
 <script>
     // ==================== CONFIGURAÇÕES GLOBAIS ====================
+    
+    // Função de conversão: usuário (C3 central) -> VexFlow (c/4 central)
+    function usuarioParaVexFlow(notaUsuario, octaveUsuario) {
+        const notesMap = {
+            'C': 'c', 'C#': 'c#', 'D': 'd', 'D#': 'd#', 'E': 'e',
+            'F': 'f', 'F#': 'f#', 'G': 'g', 'G#': 'g#', 'A': 'a', 'A#': 'a#', 'B': 'b'
+        };
+        const noteName = notaUsuario.replace('♯', '#');
+        const vexNote = notesMap[noteName] || noteName.toLowerCase();
+        const vexOctave = octaveUsuario + 1; // C3 (usuário) = c/4 (VexFlow)
+        return vexNote + '/' + vexOctave;
+    }
+    
+    function vexFlowParaUsuario(vexNota) {
+        const [note, octave] = vexNota.split('/');
+        const notesMapRev = {
+            'c': 'C', 'c#': 'C#', 'd': 'D', 'd#': 'D#', 'e': 'E',
+            'f': 'F', 'f#': 'F#', 'g': 'G', 'g#': 'G#', 'a': 'A', 'a#': 'A#', 'b': 'B'
+        };
+        const usuarioNote = notesMapRev[note] || note.toUpperCase();
+        const usuarioOctave = parseInt(octave) - 1;
+        return { note: usuarioNote, octave: usuarioOctave };
+    }
+
     const tratamentosPorEspecie = {
         2: ['A - Nota de passagem', 'B - Bordadura Inferior', 'C - Bordadura Superior', 'D - Sem Dissonâncias'],
         3: ['A - Nota de passagem', 'B - Bordadura', 'C - Cambiata', 'D - Bordadura dupla', 'E - Grupo de notas de passagem', 'F - Nota de passagem acentuada', 'G - Bordadura acentuada'],
@@ -515,15 +563,13 @@
         5: ['A - Nota de passagem', 'B - Bordadura', 'C - Cambiata', 'D - Bordadura dupla', 'E - Grupo de notas de passagem', 'F - Nota de passagem acentuada', 'G - Bordadura acentuada', 'H - Suspensão e retardo', 'I - Suspensão com resolução interrompida', 'J - Apojatura', 'K - Antecipação']
     };
 
-    // Intervalos consonantes
-    const INTERVALOS_CONSONANTES = [0, 3, 4, 7, 8]; // uníssono, 3ª, 4ª, 5ª, 6ª, 8ª (em semitons)
+    const INTERVALOS_CONSONANTES = [0, 3, 4, 7, 8];
     
     function isConsonante(intervaloSemitons) {
         const mod = Math.abs(intervaloSemitons) % 12;
         return [0, 3, 4, 7, 8, 9].includes(mod);
     }
 
-    // Mapeamento de armaduras
     function getKeySignatureString(tonalityName) {
         const map = {
             'C Maior': 'C',
@@ -537,10 +583,9 @@
         return map[tonalityName] || 'C';
     }
 
-    // Conversão de nota para número (para cálculos de intervalo)
-    function noteToNumber(noteWithOctave) {
+    function noteToNumber(vexNote) {
         const notes = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
-        const [note, octave] = noteWithOctave.split('/');
+        const [note, octave] = vexNote.split('/');
         const noteIndex = notes.indexOf(note);
         return (parseInt(octave) + 1) * 12 + noteIndex;
     }
@@ -560,7 +605,6 @@
     let currentCantusPosition = 'superior';
     let currentCantusClef = 'treble';
     let currentCantusNotes = [];
-    let currentContrapontoNotes = [];
     let questions = [];
     let currentQuestionIndex = 0;
     let userAnswers = [];
@@ -574,6 +618,7 @@
     let renderer = null;
     let context = null;
     let audioActivated = false;
+    let lastAnswerFeedback = null;
 
     function loadHistory() {
         const saved = localStorage.getItem('contraponto_history');
@@ -588,6 +633,15 @@
 
     function saveHistory() {
         localStorage.setItem('contraponto_history', JSON.stringify(attemptsHistory));
+    }
+
+    function showFeedback(message, isCorrect) {
+        const toast = document.createElement('div');
+        toast.className = 'feedback-toast';
+        toast.style.backgroundColor = isCorrect ? '#3a8b5a' : '#8b3a3a';
+        toast.innerHTML = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
     }
 
     function activateAudio() {
@@ -650,15 +704,16 @@
         });
     }
 
-    function getRandomScaleNote(minOctave, maxOctave) {
+    function getRandomScaleNote(minOctaveVex, maxOctaveVex) {
         const noteName = currentScale[Math.floor(Math.random() * currentScale.length)];
-        const octave = minOctave + Math.floor(Math.random() * (maxOctave - minOctave + 1));
+        const octave = minOctaveVex + Math.floor(Math.random() * (maxOctaveVex - minOctaveVex + 1));
         return noteName + '/' + octave;
     }
 
-    function getScaleNoteAtInterval(baseNote, intervalSteps) {
-        const baseNum = noteToNumber(baseNote);
-        const scaleStep = currentScaleNumbers.indexOf(baseNum % 12);
+    function getScaleNoteAtInterval(baseNoteVex, intervalSteps) {
+        const baseNum = noteToNumber(baseNoteVex);
+        const baseNoteName = baseNoteVex.split('/')[0];
+        const scaleStep = currentScale.indexOf(baseNoteName);
         if (scaleStep === -1) return null;
         const targetStep = (scaleStep + intervalSteps + currentScale.length) % currentScale.length;
         const targetNoteName = currentScale[targetStep];
@@ -670,13 +725,13 @@
         currentCantusPosition = Math.random() < 0.5 ? 'superior' : 'inferior';
         currentCantusClef = currentCantusPosition === 'superior' ? 'treble' : 'bass';
         
-        let minOctave, maxOctave;
+        let minOctaveVex, maxOctaveVex;
         if (currentCantusPosition === 'superior') {
-            minOctave = 3;
-            maxOctave = 5;
+            minOctaveVex = 4;
+            maxOctaveVex = 6;
         } else {
-            minOctave = 2;
-            maxOctave = 4;
+            minOctaveVex = 3;
+            maxOctaveVex = 5;
         }
         
         let startNote, endNote;
@@ -684,26 +739,16 @@
         let attempts = 0;
         
         while (!valid && attempts < 50) {
-            startNote = getRandomScaleNote(minOctave, maxOctave);
+            startNote = getRandomScaleNote(minOctaveVex, maxOctaveVex);
             const startNum = noteToNumber(startNote);
             
             let possibleEndNotes = [];
             for (let i = 0; i < currentScale.length; i++) {
-                for (let oct = minOctave; oct <= maxOctave; oct++) {
+                for (let oct = minOctaveVex; oct <= maxOctaveVex; oct++) {
                     const endNum = (Math.floor(startNum / 12) - 1 + Math.floor(i / currentScale.length) + oct) * 12 + currentScaleNumbers[i % currentScale.length] % 12;
                     const interval = Math.abs(endNum - startNum);
                     if (interval >= 2 && interval <= 12 && interval !== 7) {
-                        if (currentCantusPosition === 'superior') {
-                            const endOctave = Math.floor(endNum / 12) - 1;
-                            if (endOctave >= 3 && endOctave <= 5) {
-                                possibleEndNotes.push(numberToNote(endNum));
-                            }
-                        } else {
-                            const endOctave = Math.floor(endNum / 12) - 1;
-                            if (endOctave >= 2 && endOctave <= 4) {
-                                possibleEndNotes.push(numberToNote(endNum));
-                            }
-                        }
+                        possibleEndNotes.push(numberToNote(endNum));
                     }
                 }
             }
@@ -724,17 +769,13 @@
             { note: endNote, duration: 'w' }
         ];
         
-        console.log('DEBUG - Cantus gerado:', currentCantusNotes, 'Posição:', currentCantusPosition);
+        console.log('DEBUG - Cantus gerado (VexFlow):', currentCantusNotes, 'Posição:', currentCantusPosition);
         return currentCantusNotes;
     }
 
     function gerarContraponto2aEspecie(tratamento, cantusNotes, posicaoCantus) {
         const cantusNote1 = cantusNotes[0].note;
         const cantusNote2 = cantusNotes[1].note;
-        const cantusNum1 = noteToNumber(cantusNote1);
-        const cantusNum2 = noteToNumber(cantusNote2);
-        
-        const isCantusSuperior = posicaoCantus === 'superior';
         
         let preparacao, dissonancia, resolucao;
         let valid = false;
@@ -742,38 +783,22 @@
         
         while (!valid && attempts < 100) {
             if (tratamento === 'D - Sem Dissonâncias') {
-                const possiveisPreparacoes = [];
-                for (let i = -5; i <= 5; i++) {
-                    const interval = Math.abs((cantusNum1 + i) - cantusNum1);
-                    if (isConsonante(interval) && interval > 0) {
-                        const notaNum = cantusNum1 + i;
-                        const nota = numberToNote(notaNum);
-                        if (nota && Math.abs(i) <= 5) {
-                            possiveisPreparacoes.push(nota);
-                        }
-                    }
-                }
-                if (possiveisPreparacoes.length > 0) {
-                    preparacao = possiveisPreparacoes[Math.floor(Math.random() * possiveisPreparacoes.length)];
-                    dissonancia = preparacao;
-                    resolucao = getScaleNoteAtInterval(preparacao, Math.random() > 0.5 ? 1 : -1);
-                    if (resolucao) valid = true;
-                }
+                preparacao = cantusNote1;
+                dissonancia = cantusNote1;
+                resolucao = cantusNote2;
+                valid = true;
             }
             
             if (tratamento === 'A - Nota de passagem') {
                 for (let dir of [1, -1]) {
-                    const degrau = getScaleNoteAtInterval(cantusNote1, dir);
-                    if (degrau) {
-                        const passo1 = getScaleNoteAtInterval(cantusNote1, dir);
-                        const passo2 = getScaleNoteAtInterval(passo1, dir);
-                        if (passo1 && passo2) {
-                            preparacao = cantusNote1;
-                            dissonancia = passo1;
-                            resolucao = passo2;
-                            valid = true;
-                            break;
-                        }
+                    const passo1 = getScaleNoteAtInterval(cantusNote1, dir);
+                    const passo2 = getScaleNoteAtInterval(passo1, dir);
+                    if (passo1 && passo2) {
+                        preparacao = cantusNote1;
+                        dissonancia = passo1;
+                        resolucao = passo2;
+                        valid = true;
+                        break;
                     }
                 }
             }
@@ -818,7 +843,8 @@
     }
 
     function generateQuestions() {
-        const tratamentos = tratamentosPorEspecie[currentSpecies];
+        let tratamentos = [...tratamentosPorEspecie[currentSpecies]];
+        
         const tipoA = [], tipoB = [], tipoC = [];
 
         for (let i = 0; i < 4; i++) {
@@ -856,12 +882,15 @@
                 resposta: tratamento,
                 partitura: { cantus: cantus, contraponto: contraponto, cantusPosition: currentCantusPosition, cantusClef: currentCantusClef }
             });
+            
+            let tratamentosC = tratamentos.filter(t => t !== 'D - Sem Dissonâncias');
+            const tratamentoC = tratamentosC[i % tratamentosC.length];
             tipoC.push({
                 id: `c${i}`,
                 tipo: 'c',
-                enunciado: `Escreva uma dissonância do tipo "${tratamento}" no contraponto (clique no teclado):`,
-                tratamento: tratamento,
-                resposta: tratamento,
+                enunciado: `Escreva uma dissonância do tipo "${tratamentoC}" no contraponto (clique no teclado):`,
+                tratamento: tratamentoC,
+                resposta: tratamentoC,
                 cantus: cantus,
                 cantusPosition: currentCantusPosition,
                 cantusClef: currentCantusClef,
@@ -893,7 +922,8 @@
             const noteSpan = document.createElement('span');
             noteSpan.className = 'note-item';
             const duracaoDisplay = nota.duration === 'w' ? '𝅜' : nota.duration === 'h' ? '𝅗𝅥' : nota.duration === 'q' ? '♩' : '♪';
-            noteSpan.innerHTML = `${duracaoDisplay} ${nota.note.replace('/', '').toUpperCase()}`;
+            const notaUsuario = vexFlowParaUsuario(nota.note);
+            noteSpan.innerHTML = `${duracaoDisplay} ${notaUsuario.note}${notaUsuario.octave}`;
             noteSpan.title = 'Clique para remover esta nota';
             noteSpan.onclick = () => {
                 userContraponto.splice(index, 1);
@@ -1072,7 +1102,8 @@
         if (cantus) {
             cantus.forEach((note) => {
                 const durationVal = duracaoMap[note.duration] || 1;
-                synthCantus.triggerAttackRelease(note.note.replace('/', ''), durationVal, now + time);
+                const noteName = note.note.replace('/', '');
+                synthCantus.triggerAttackRelease(noteName, durationVal, now + time);
                 time += durationVal;
             });
         }
@@ -1081,7 +1112,8 @@
         if (contraponto) {
             contraponto.forEach((note) => {
                 const durationVal = duracaoMap[note.duration] || 1;
-                synthContraponto.triggerAttackRelease(note.note.replace('/', ''), durationVal, now + time2);
+                const noteName = note.note.replace('/', '');
+                synthContraponto.triggerAttackRelease(noteName, durationVal, now + time2);
                 time2 += durationVal;
             });
         }
@@ -1093,7 +1125,11 @@
         document.getElementById('question-text').innerHTML = q.enunciado;
         document.getElementById('progress-info').innerHTML = `Questão ${currentQuestionIndex+1} de ${questions.length} | Tipo: ${q.tipo === 'a' ? 'Auditiva' : q.tipo === 'b' ? 'Análise' : 'Escrita'} | Tratamento esperado: ${q.tratamento}`;
 
-        const tratamentosList = tratamentosPorEspecie[currentSpecies];
+        let tratamentosList = [...tratamentosPorEspecie[currentSpecies]];
+        if (q.tipo === 'c') {
+            tratamentosList = tratamentosList.filter(t => t !== 'D - Sem Dissonâncias');
+        }
+        
         const alts = [...tratamentosList];
         if (!alts.includes(q.resposta)) alts.push(q.resposta);
         const altsContainer = document.getElementById('alternatives-container');
@@ -1105,10 +1141,18 @@
             if (currentQuestionResponse === alt) btn.classList.add('selected');
             btn.innerHTML = alt;
             btn.onclick = () => {
+                const isCorrect = alt === q.resposta;
                 currentQuestionResponse = alt;
                 document.querySelectorAll('.alt-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
                 userAnswers[currentQuestionIndex] = alt;
+                
+                if (isCorrect) {
+                    showFeedback(`✅ Correta! A resposta era "${q.resposta}"`, true);
+                } else {
+                    showFeedback(`❌ Incorreta. A resposta correta era "${q.resposta}"`, false);
+                }
+                
                 if (currentQuestionIndex === questions.length - 1) {
                     endExercise();
                 }
@@ -1123,7 +1167,7 @@
             userContraponto = [];
             updateNotesList();
             pianoDiv.style.display = 'block';
-            answersDiv.classList.add('hidden');
+            answersDiv.classList.remove('hidden');
             drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
         } else {
             pianoDiv.style.display = 'none';
@@ -1263,25 +1307,6 @@
     }
 
     function nextQuestion() {
-        if (currentQuestionResponse === null && questions[currentQuestionIndex]?.tipo !== 'c') {
-            document.getElementById('modal-message').innerText = 'Você ainda não respondeu esta questão. Deseja prosseguir mesmo assim?';
-            const modal = document.getElementById('modal');
-            modal.style.display = 'flex';
-            const confirm = () => {
-                modal.style.display = 'none';
-                if (currentQuestionIndex + 1 < questions.length) {
-                    currentQuestionIndex++;
-                    currentQuestionResponse = null;
-                    renderCurrentQuestion();
-                } else {
-                    endExercise();
-                }
-                document.getElementById('modal-confirm').removeEventListener('click', confirm);
-            };
-            document.getElementById('modal-confirm').onclick = confirm;
-            document.getElementById('modal-cancel').onclick = () => modal.style.display = 'none';
-            return;
-        }
         if (currentQuestionIndex + 1 < questions.length) {
             currentQuestionIndex++;
             currentQuestionResponse = null;
@@ -1292,45 +1317,43 @@
     }
 
     function initPiano() {
-        const notas = [];
-        const oitavas = [2, 3, 4, 5, 6];
-        const notasBase = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
-        
-        oitavas.forEach(octave => {
-            notasBase.forEach(note => {
-                notas.push({ note: note, octave: octave });
-            });
-        });
+        const notasBase = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const oitavas = [1, 2, 3, 4, 5];
         
         const container = document.getElementById('piano-keys');
         container.innerHTML = '';
         
-        notas.forEach(({ note, octave }) => {
-            const key = document.createElement('div');
-            key.className = 'piano-key' + (note.includes('#') ? ' black' : '');
-            key.style.backgroundColor = note.includes('#') ? '#333' : 'white';
-            key.style.color = note.includes('#') ? 'white' : '#333';
-            key.style.display = 'flex';
-            key.style.alignItems = 'flex-end';
-            key.style.justifyContent = 'center';
-            key.style.paddingBottom = '5px';
-            key.style.fontSize = '8px';
-            const displayNote = note.replace('#', '♯').toUpperCase();
-            key.innerHTML = `${displayNote}${octave}`;
-            key.onclick = () => {
-                const q = questions[currentQuestionIndex];
-                if (q && q.tipo === 'c') {
-                    userContraponto.push({ note: note + '/' + octave, duration: selectedDuration });
-                    updateNotesList();
-                    drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
-                    console.log('DEBUG - Nota inserida:', note + '/' + octave, 'Duração:', selectedDuration);
-                }
-            };
-            container.appendChild(key);
+        oitavas.forEach(octave => {
+            notasBase.forEach(note => {
+                const key = document.createElement('div');
+                const hasSharp = note.includes('#');
+                key.className = 'piano-key' + (hasSharp ? ' black' : '');
+                key.style.backgroundColor = hasSharp ? '#333' : 'white';
+                key.style.color = hasSharp ? 'white' : '#333';
+                key.style.display = 'flex';
+                key.style.alignItems = 'flex-end';
+                key.style.justifyContent = 'center';
+                key.style.paddingBottom = '5px';
+                key.style.fontSize = '8px';
+                
+                const displayNote = note.replace('#', '♯');
+                key.innerHTML = `${displayNote}${octave}`;
+                
+                key.onclick = () => {
+                    const q = questions[currentQuestionIndex];
+                    if (q && q.tipo === 'c') {
+                        const vexNote = usuarioParaVexFlow(note, octave);
+                        userContraponto.push({ note: vexNote, duration: selectedDuration });
+                        updateNotesList();
+                        drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
+                        console.log('DEBUG - Nota inserida (usuário):', note + octave, '→ (VexFlow):', vexNote);
+                    }
+                };
+                container.appendChild(key);
+            });
         });
     }
 
-    // Atalhos de teclado para durações
     document.addEventListener('keydown', (e) => {
         const key = e.key;
         const durationMap = {
@@ -1371,6 +1394,7 @@
     
     console.log('✅ Sistema carregado. Aguardando início do exercício.');
     console.log('💡 Atalhos de teclado: 1=Semibreve, 2=Mínima, 4=Semínima, 8=Colcheia');
+    console.log('💡 Mapeamento: C3 (usuário) = c/4 (VexFlow)');
 </script>
 </body>
 </html>
