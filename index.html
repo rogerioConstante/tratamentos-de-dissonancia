@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias v26.04.9</title>
+    <title>Exercícios de Tratamento de Dissonâncias v26.04.10</title>
 
     <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
@@ -355,7 +355,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Contraponto & Dissonâncias</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.9</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.10</div>
     </div>
 
     <div class="config-panel">
@@ -511,7 +511,8 @@ let currentScaleUpper = [];
 let questions = [];
 let currentQuestionIndex = 0;
 let userAnswers = [];
-let startTime = null;
+let startTimePerf = null;   // performance.now() — para calcular duração
+let startTimeDate = null;   // new Date()        — para exibir no relatório
 let endTime = null;
 let attemptId = 0;
 let attemptsHistory = [];
@@ -620,13 +621,31 @@ function generateCantusFirmus(isUpperVoice) {
     ];
 }
 
+// Retorna true se há cruzamento entre contraponto e cantus simultâneo
+// cpAbaixo=true: contraponto deve ser numericamente menor que cantus
+function hasCruzamento(cpNote, cantusNote, cpAbaixo) {
+    const cpNum     = noteToNumber(cpNote);
+    const cantusNum = noteToNumber(cantusNote);
+    if (cpAbaixo) return cpNum >= cantusNum;   // cp deve estar abaixo
+    else          return cpNum <= cantusNum;   // cp deve estar acima
+}
+
+// Retorna true se as duas progressões formam 5ªs ou 8ªs paralelas/diretas
+// (intervalo mod 12 igual em ambos os momentos, com movimento paralelo)
+function hasParalelas(cpA, cpB, cantusA, cantusB) {
+    const intA = Math.abs(noteToNumber(cpA) - noteToNumber(cantusA)) % 12;
+    const intB = Math.abs(noteToNumber(cpB) - noteToNumber(cantusB)) % 12;
+    if (intA !== intB) return false;
+    return intA === 0 || intA === 7;  // uníssono/8ª ou 5ª justa
+}
+
 function gerarContraponto2aEspecie(tratamento, cantusNotes, isUpperVoice) {
     if (!cantusNotes || cantusNotes.length < 2) return null;
     
     const cantusNote1 = cantusNotes[0].note;
     const s1 = noteToNumber(cantusNote1);
     const cantusNote2 = cantusNotes[1].note;
-    const cpAbaixo = isUpperVoice;
+    const cpAbaixo = isUpperVoice;   // cantus superior → cp vai abaixo
     const rangeMin = cpAbaixo ? s1 - 19 : s1 + 1;
     const rangeMax = cpAbaixo ? s1 - 1  : s1 + 19;
 
@@ -640,7 +659,7 @@ function gerarContraponto2aEspecie(tratamento, cantusNotes, isUpperVoice) {
 
     if (candidatos.length === 0) return null;
     const preparacoes = embaralhar(candidatos);
-    console.log("Tratamento", tratamento, " | Cantus", cantusNote1, cantusNote2)
+    console.log("Tratamento", tratamento, " | Cantus", cantusNote1, cantusNote2);
     for (let x = 0; x < preparacoes.length; x++) {
         let dissonancia, resolucao;
         const prep = preparacoes[x];
@@ -656,16 +675,30 @@ function gerarContraponto2aEspecie(tratamento, cantusNotes, isUpperVoice) {
             dissonancia = scaleStep(prep, 1);
             resolucao   = prep;
         }
-        console.log("Preparação", prep, " | dissonância", dissonancia, " | resolução", resolucao)
-        if (dissonancia && resolucao &&
-            !isConsonant(noteToNumber(dissonancia) - noteToNumber(cantusNote1)) &&
-            isConsonant(noteToNumber(resolucao) - noteToNumber(cantusNote2))) {
-            return [
-                { note: prep,  duration: 'h' },
-                { note: dissonancia, duration: 'h' },
-                { note: resolucao,   duration: 'w' }
-            ];
-        }
+
+        if (!dissonancia || !resolucao) continue;
+
+        // 1. Dissonância real no 2º tempo
+        if (isConsonant(noteToNumber(dissonancia) - noteToNumber(cantusNote1))) continue;
+        // 2. Resolução consonante com cantus2
+        if (!isConsonant(noteToNumber(resolucao) - noteToNumber(cantusNote2))) continue;
+
+        // 3. Cruzamento de vozes
+        if (hasCruzamento(prep,       cantusNote1, cpAbaixo)) continue;
+        if (hasCruzamento(dissonancia, cantusNote1, cpAbaixo)) continue;
+        if (hasCruzamento(resolucao,   cantusNote2, cpAbaixo)) continue;
+
+        // 4. 5ªs e 8ªs paralelas: par prep→res / cantus1→cantus2
+        if (hasParalelas(prep, resolucao, cantusNote1, cantusNote2)) continue;
+        // 5. 5ªs e 8ªs paralelas: par dis→res / cantus1→cantus2
+        if (hasParalelas(dissonancia, resolucao, cantusNote1, cantusNote2)) continue;
+
+        console.log("Preparação", prep, " | dissonância", dissonancia, " | resolução", resolucao);
+        return [
+            { note: prep,        duration: 'h' },
+            { note: dissonancia, duration: 'h' },
+            { note: resolucao,   duration: 'w' }
+        ];
     }
     return null;
 }
@@ -716,6 +749,35 @@ function analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado) {
         return { ok: false, erro: 'A segunda mínima não é dissonante' };
     }
 
+    // Determina se o contraponto deve estar abaixo do cantus
+    // (inferido pela posição relativa da preparação)
+    const cpAbaixo = noteToNumber(n1.note) < noteToNumber(cantus1);
+
+    // Cruzamento de vozes
+    if (hasCruzamento(n1.note, cantus1, cpAbaixo)) {
+        return { ok: false, erro: 'Cruzamento de vozes na preparação' };
+    }
+    if (hasCruzamento(n2.note, cantus1, cpAbaixo)) {
+        return { ok: false, erro: 'Cruzamento de vozes na dissonância' };
+    }
+    if (hasCruzamento(n3.note, cantus2, cpAbaixo)) {
+        return { ok: false, erro: 'Cruzamento de vozes na resolução' };
+    }
+
+    // 5ªs e 8ªs paralelas: prep→res / cantus1→cantus2
+    if (hasParalelas(n1.note, n3.note, cantus1, cantus2)) {
+        const intMod = Math.abs(noteToNumber(n1.note) - noteToNumber(cantus1)) % 12;
+        const tipo = (intMod === 0) ? '8ªs' : '5ªs';
+        return { ok: false, erro: `${tipo} paralelas entre preparação→resolução e cantus` };
+    }
+
+    // 5ªs e 8ªs paralelas: dis→res / cantus1→cantus2
+    if (hasParalelas(n2.note, n3.note, cantus1, cantus2)) {
+        const intMod = Math.abs(noteToNumber(n2.note) - noteToNumber(cantus1)) % 12;
+        const tipo = (intMod === 0) ? '8ªs' : '5ªs';
+        return { ok: false, erro: `${tipo} paralelas entre dissonância→resolução e cantus` };
+    }
+
     const num1 = noteToNumber(n1.note);
     const num2 = noteToNumber(n2.note);
     const num3 = noteToNumber(n3.note);
@@ -763,7 +825,7 @@ function validarRespostaEscrita(q) {
 
     if (resultado.ok) {
         showFeedback('✅ Correto!', true);
-        userAnswers[currentQuestionIndex] = true;
+        userAnswers[currentQuestionIndex] = q.resposta;  // mesmo formato dos tipos A e B
         questionAnswered = true;
     } else {
         showFeedback(`❌ ${resultado.erro}`, false);
@@ -843,7 +905,7 @@ function generateQuestions() {
         
         tipoC.push({
             id: `c${i}`, tipo: 'c',
-            enunciado: `Escreva uma dissonância do tipo <strong>"${tratamentoC}"</strong> no contraponto (use o teclado abaixo):`,
+            enunciado: `Escreva uma dissonância do tipo <strong>"${tratamentoC}"</strong> no contraponto — use a estrutura rítmica: <strong>mínima · mínima · semibreve</strong> (use o teclado abaixo):`,
             tratamento: tratamentoC, resposta: tratamentoC,
             cantus: cantusC,
             cantusPosition: cantusPositionC,
@@ -897,7 +959,6 @@ function drawBlankScore(cantusPosition, cantusClef) {
             if (i === 0) {
                 sc.addClef(cantusClef);
                 if (keySig !== 'C') sc.addKeySignature(keySig);
-                sc.addTimeSignature('4/4');
             }
             sc.setContext(context).draw();
 
@@ -905,7 +966,6 @@ function drawBlankScore(cantusPosition, cantusClef) {
             if (i === 0) {
                 scp.addClef(clefContra);
                 if (keySig !== 'C') scp.addKeySignature(keySig);
-                scp.addTimeSignature('4/4');
             }
             scp.setContext(context).draw();
         }
@@ -985,7 +1045,6 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             if (i === 0) {
                 sc.addClef(cantusClef);
                 if (keySig !== 'C') sc.addKeySignature(keySig);
-                sc.addTimeSignature('4/4');
             }
             sc.setContext(context).draw();
             stavesC.push(sc);
@@ -994,7 +1053,6 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             if (i === 0) {
                 scp.addClef(clefContra);
                 if (keySig !== 'C') scp.addKeySignature(keySig);
-                scp.addTimeSignature('4/4');
             }
             scp.setContext(context).draw();
             stavesCP.push(scp);
@@ -1006,10 +1064,16 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             conn.setContext(context).draw();
         }
 
-        function criarStaveNotes(notasComp, clef) {
+        function criarStaveNotes(notasComp, clef, stemDir) {
             return notasComp.map(n => {
                 try {
-                    return new Vex.Flow.StaveNote({ keys: [n.note], duration: n.duration, clef: clef });
+                    const sn = new Vex.Flow.StaveNote({
+                        keys: [n.note],
+                        duration: n.duration,
+                        clef: clef,
+                        stem_direction: stemDir
+                    });
+                    return sn;
                 } catch(e) {
                     console.warn('StaveNote error:', n, e);
                     return null;
@@ -1028,11 +1092,15 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             voice.draw(context, stave);
         }
 
+        // Cantus: hastes para cima; contraponto: hastes para baixo
+        const STEM_UP   =  1;
+        const STEM_DOWN = -1;
+
         for (let i = 0; i < numCompassos; i++) {
             const notasC  = ccantus[i] || [];
             const notasCP = ccp[i] || [];
-            const snotesC  = criarStaveNotes(notasC,  cantusClef);
-            const snotesCP = criarStaveNotes(notasCP, clefContra);
+            const snotesC  = criarStaveNotes(notasC,  cantusClef,  STEM_UP);
+            const snotesCP = criarStaveNotes(notasCP, clefContra,  STEM_DOWN);
             const temposC  = notasC.reduce((s,n) => s + (duracaoMap[n.duration] || 0), 0);
             const temposCP = notasCP.reduce((s,n) => s + (duracaoMap[n.duration] || 0), 0);
             desenharVoz(snotesC,  stavesC[i],  temposC);
@@ -1306,7 +1374,7 @@ function saveHistory() {
 
 function endExercise() {
     endTime = performance.now();
-    const tempoMs = endTime - startTime;
+    const tempoMs = endTime - startTimePerf;
     let acertos = 0;
     const acertosPorTipo  = { a:0, b:0, c:0 };
     const totalPorTipo    = { a:0, b:0, c:0 };
@@ -1330,7 +1398,7 @@ function endExercise() {
         nome: document.getElementById('student-name').value || 'Anônimo',
         especie: currentSpecies + 'ª',
         tom: currentTonalityName,
-        dataHoraInicio: new Date(startTime).toLocaleString(),
+        dataHoraInicio: startTimeDate.toLocaleString(),
         dataHoraFim: new Date().toLocaleString(),
         tempoMs,
         notaFinal: nota,
@@ -1437,7 +1505,8 @@ function startExercise() {
     userContraponto = [];
     questionAnswered = false;
     updateNotesList();
-    startTime = performance.now();
+    startTimePerf = performance.now();
+    startTimeDate = new Date();
     endTime = null;
 
     renderCurrentQuestion();
@@ -1478,7 +1547,7 @@ document.getElementById('clear-all-notes').onclick = clearAllNotes;
 loadHistory();
 initPiano();
 
-console.log('✅ Contraponto & Dissonâncias v26.04.9 carregado com lógica de retry.');
+console.log('✅ Contraponto & Dissonâncias v26.04.10 carregado.');
 </script>
 </body>
 </html>
