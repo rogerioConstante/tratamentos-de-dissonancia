@@ -3,12 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias v26.04.10</title>
+    <title>Exercícios de Tratamento de Dissonâncias v26.04.12</title>
 
     <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- SpessaSynth: carregado via ESM com worklet registrado por Blob URL (funciona em file:// e https://) -->
+    <script type="module">
+        // URLs do unpkg para spessasynth_lib e seu worklet processor
+        const LIB_URL      = 'https://unpkg.com/spessasynth_lib@3.17.0/dist/spessasynth_lib.min.js';
+        const WORKLET_URL  = 'https://unpkg.com/spessasynth_lib@3.17.0/dist/spessasynth_processor.min.js';
+
+        function setStatusSF(msg, warn) {
+            const el = document.getElementById('sf-status');
+            if (!el) return;
+            el.textContent = msg;
+            el.style.color = warn ? '#e0a030' : '#4da87a';
+        }
+
+        async function initSpessaSynth(sfBuffer) {
+            try {
+                // Carrega a biblioteca via import dinâmico
+                const lib = await import(LIB_URL);
+                const SynthetzerClass = lib.Synthetizer || lib.WorkletSynthesizer || Object.values(lib)[0];
+
+                // Faz fetch do worklet processor e converte em Blob URL
+                // para funcionar em file:// sem servidor
+                const workletResp = await fetch(WORKLET_URL);
+                if (!workletResp.ok) throw new Error('Worklet HTTP ' + workletResp.status);
+                const workletText = await workletResp.text();
+                const workletBlob = new Blob([workletText], { type: 'application/javascript' });
+                const workletBlobURL = URL.createObjectURL(workletBlob);
+
+                const audioCtx = new AudioContext();
+                await audioCtx.audioWorklet.addModule(workletBlobURL);
+                URL.revokeObjectURL(workletBlobURL);
+
+                const synth = new SynthetzerClass(audioCtx.destination, sfBuffer);
+                // Aguarda o sintetizador ficar pronto (versões mais recentes expõem .isReady)
+                if (synth.isReady) await synth.isReady;
+
+                window._spessa = { synth, audioCtx };
+                console.log('✅ SpessaSynth pronto');
+            } catch(e) {
+                console.warn('⚠️ SpessaSynth falhou, usando Tone.js como fallback:', e);
+                window._spessa = null;
+                setStatusSF('⚠️ Usando síntese básica (Tone.js)', true);
+            }
+        }
+
+        // Expõe carregamento de SF local ao botão do DOM
+        window._loadLocalSF = async function(file) {
+            setStatusSF(`⏳ Carregando ${file.name}…`, false);
+            try {
+                const buf = await file.arrayBuffer();
+                if (window._spessa) {
+                    try { window._spessa.audioCtx.close(); } catch(_) {}
+                    window._spessa = null;
+                }
+                await initSpessaSynth(buf);
+                if (window._spessa) {
+                    setStatusSF(`✅ ${file.name}`, false);
+                }
+            } catch(e) {
+                console.error('❌ Erro ao carregar SF local:', e);
+                setStatusSF(`❌ Falha ao carregar ${file.name}`, true);
+            }
+        };
+
+        // Ao carregar a página: SpessaSynth fica aguardando SF do usuário.
+        // Enquanto não houver SF carregada, o Tone.js é usado automaticamente.
+        setStatusSF('📂 Carregue uma soundfont SF2/SF3 para áudio de qualidade', false);
+        document.getElementById('sf-status').style.color = '#9a9a9a';
+
+    </script>
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -344,6 +414,44 @@
             justify-content: center;
         }
 
+        .sf-panel {
+            background: #1e1e1e;
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            flex-wrap: wrap;
+            font-size: 13px;
+        }
+
+        .sf-panel label { color: #3a6ea5; font-weight: bold; }
+
+        .sf-panel select {
+            background: #2d2d2d;
+            color: #e0e0e0;
+            border: 1px solid #3a6ea5;
+            padding: 6px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #sf-status {
+            color: #4da87a;
+            font-size: 12px;
+            min-width: 180px;
+        }
+
+        #sf-file-input { display: none; }
+
+        .sf-load-btn {
+            padding: 6px 14px;
+            font-size: 12px;
+            background: #555;
+        }
+
+        .sf-load-btn:hover { background: #777; }
+
         @media (max-width: 768px) {
             .piano-key { width: 28px; height: 80px; }
             .piano-key.black { width: 18px; height: 50px; margin-left: -9px; margin-right: -9px; }
@@ -355,7 +463,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Contraponto & Dissonâncias</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.10</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.12</div>
     </div>
 
     <div class="config-panel">
@@ -375,6 +483,17 @@
         <div class="config-group">
             <label>🎹 Tom:</label>
             <span id="tonality-display" style="color:#3a6ea5; font-weight:bold;">Aleatório ao iniciar</span>
+        </div>
+        <div class="sf-panel">
+            <label>🎵 Instrumento:</label>
+            <select id="instrument-select">
+                <option value="0">🎹 Piano</option>
+                <option value="19">🎹 Órgão</option>
+                <option value="48">🎻 Cordas</option>
+            </select>
+            <span id="sf-status" style="color:#9a9a9a;">⏳ Inicializando…</span>
+            <input type="file" id="sf-file-input" accept=".sf2,.sf3">
+            <button class="sf-load-btn" onclick="document.getElementById('sf-file-input').click()">📂 Carregar SF2/SF3</button>
         </div>
     </div>
 
@@ -1115,33 +1234,89 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
 
 // ==================== ÁUDIO ====================
 
-async function playScore(cantus, contraponto) {
+// Mapeia nota VexFlow (ex: "c/4") para número MIDI
+function vexToMidi(vexNote) {
+    // noteToNumber já retorna semitones absolutos compatíveis com MIDI
+    // mas usa (octave+1)*12, então MIDI = noteToNumber - 12
+    return noteToNumber(vexNote) - 12;
+}
+
+async function playScoreSpessa(cantus, contraponto) {
+    const sp = window._spessa;
+    if (!sp) return false;
+
+    try {
+        await sp.audioCtx.resume();
+    } catch(_) {}
+
+    const programa = parseInt(document.getElementById('instrument-select')?.value ?? '0');
+    const durMap   = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25 };
+    const BPM      = 1.0;   // 1 beat = 1 segundo
+    const CANAL_C  = 0;
+    const CANAL_CP = 1;
+    const VEL      = 90;
+
+    try {
+        sp.synth.programChange(CANAL_C,  programa);
+        sp.synth.programChange(CANAL_CP, programa);
+    } catch(e) {
+        console.warn('programChange não suportado nesta versão:', e);
+    }
+
+    function agendarVoz(notas, canal) {
+        let t = 0;
+        (notas || []).forEach(n => {
+            const dur  = (durMap[n.duration] || 1) * BPM;
+            const midi = vexToMidi(n.note);
+            if (midi < 0 || midi > 127) { t += dur; return; }
+            const tOn  = t;
+            const tOff = t + dur * 0.92;
+            setTimeout(() => {
+                try { sp.synth.noteOn(canal, midi, VEL); } catch(_) {}
+            }, tOn * 1000);
+            setTimeout(() => {
+                try { sp.synth.noteOff(canal, midi); } catch(_) {}
+            }, tOff * 1000);
+            t += dur;
+        });
+    }
+
+    agendarVoz(cantus,      CANAL_C);
+    agendarVoz(contraponto, CANAL_CP);
+    return true;
+}
+
+async function playScoreTone(cantus, contraponto) {
     await Tone.start();
     const synthC  = new Tone.PolySynth(Tone.Synth).toDestination();
     const synthCP = new Tone.PolySynth(Tone.Synth).toDestination();
     const now = Tone.now();
-    const durMap = { 'w':4, 'h':2, 'q':1, '8':0.5 };
+    const durMap = { 'w': 4, 'h': 2, 'q': 1, '8': 0.5 };
 
     let t = 0;
     (cantus || []).forEach(n => {
         const dur = durMap[n.duration] || 1;
-        const noteName = n.note.replace('/','');
-        synthC.triggerAttackRelease(noteName, dur, now + t);
+        synthC.triggerAttackRelease(n.note.replace('/', ''), dur, now + t);
         t += dur;
     });
-
     let t2 = 0;
     (contraponto || []).forEach(n => {
         const dur = durMap[n.duration] || 1;
-        const noteName = n.note.replace('/','');
-        synthCP.triggerAttackRelease(noteName, dur, now + t2);
+        synthCP.triggerAttackRelease(n.note.replace('/', ''), dur, now + t2);
         t2 += dur;
     });
 }
 
+async function playScore(cantus, contraponto) {
+    const usedSpessa = await playScoreSpessa(cantus, contraponto);
+    if (!usedSpessa) await playScoreTone(cantus, contraponto);
+}
+
 function activateAudio() {
-    if (!audioActivated && Tone.context.state !== 'running') {
-        Tone.start().then(() => { audioActivated = true; });
+    // Com SpessaSynth o AudioContext é retomado em playScore.
+    // Mantém compatibilidade com Tone.js.
+    if (window.Tone && Tone.context.state !== 'running') {
+        Tone.start().catch(() => {});
     }
 }
 
@@ -1544,10 +1719,16 @@ document.getElementById('reset-btn').onclick = () => location.reload();
 document.getElementById('generate-report-btn').onclick = exportPDF;
 document.getElementById('clear-all-notes').onclick = clearAllNotes;
 
+document.getElementById('sf-file-input').addEventListener('change', function() {
+    const file = this.files && this.files[0];
+    if (file && window._loadLocalSF) window._loadLocalSF(file);
+    this.value = ''; // reset para permitir recarregar o mesmo arquivo
+});
+
 loadHistory();
 initPiano();
 
-console.log('✅ Contraponto & Dissonâncias v26.04.10 carregado.');
+console.log('✅ Contraponto & Dissonâncias v26.04.12 carregado.');
 </script>
 </body>
 </html>
