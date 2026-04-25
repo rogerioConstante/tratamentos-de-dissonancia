@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v26.04.15</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v26.04.16</title>
 
-    <!-- ÚNICA BIBLIOTECA EXTERNA (Tone.js) -->
+    <!-- BIBLIOTECAS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -41,7 +41,7 @@
         .enunciado-body p { flex: 1; min-width: 0; line-height: 1.6; }
         .enunciado-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
         .enunciado-actions button { padding: 8px 14px; font-size: 13px; white-space: nowrap; }
-        .score-area { background: #ffffff; padding: 20px; border-radius: 8px; margin-bottom: 25px; text-align: center; overflow-x: auto; }
+        .score-area { background: #404040; padding: 20px; border-radius: 8px; margin-bottom: 25px; text-align: center; overflow-x: auto; }
         #notation-canvas { background: #ffffff; border-radius: 5px; margin: 0 auto; display: block; max-width: 100%; height: auto; }
         .virtual-piano { background: #1e1e1e; padding: 20px; border-radius: 8px; margin: 20px 0; display: none; }
         .virtual-piano h4 { color: #3a6ea5; margin-bottom: 10px; font-size: 14px; }
@@ -90,7 +90,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Contraponto & Dissonâncias</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.15 (Áudio Profissional)</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.16</div>
     </div>
 
     <div class="config-panel">
@@ -170,7 +170,6 @@ let synthCP = null;
 let toneReverb = null;
 let toneChorus = null;
 
-// Status de áudio (simplificado)
 function setAudioStatus(msg, isWarn = false) {
     console.log(isWarn ? "⚠️ " + msg : "✅ " + msg);
     const el = document.getElementById('audio-status');
@@ -180,49 +179,26 @@ function setAudioStatus(msg, isWarn = false) {
     }
 }
 
-// Inicialização avançada do Tone.js com efeitos
 async function initToneAdvanced() {
     if (toneReady) return;
-
     try {
         await Tone.start();
         setAudioStatus("🎧 Áudio ativado! ✅");
         
-        // Efeitos
-        toneReverb = new Tone.Reverb({
-            decay: 2.5,
-            wet: 0.25
-        }).toDestination();
+        toneReverb = new Tone.Reverb({ decay: 2.5, wet: 0.25 }).toDestination();
+        toneChorus = new Tone.Chorus(4, 2.5, 0.2).connect(toneReverb).start();
 
-        toneChorus = new Tone.Chorus(4, 2.5, 0.2)
-            .connect(toneReverb)
-            .start();
-
-        // Cantus (voz superior - mais sustentada, "cantabile")
         synthCantus = new Tone.PolySynth(Tone.FMSynth, {
-            harmonicity: 2,
-            modulationIndex: 3,
-            envelope: {
-                attack: 0.2,
-                decay: 0.3,
-                sustain: 0.7,
-                release: 1.5
-            }
+            harmonicity: 2, modulationIndex: 3,
+            envelope: { attack: 0.2, decay: 0.3, sustain: 0.7, release: 1.5 }
         }).connect(toneChorus);
 
-        // Contraponto (voz inferior - mais articulada)
         synthCP = new Tone.PolySynth(Tone.AMSynth, {
-            envelope: {
-                attack: 0.05,
-                decay: 0.2,
-                sustain: 0.5,
-                release: 0.8
-            }
+            envelope: { attack: 0.05, decay: 0.2, sustain: 0.5, release: 0.8 }
         }).connect(toneReverb);
 
         toneReady = true;
         setAudioStatus("🎹 Motor de áudio pronto! 🎵");
-        
     } catch (e) {
         console.error('Erro ao iniciar Tone.js:', e);
         setAudioStatus("⚠️ Erro no áudio, mas o exercício continua funcionando", true);
@@ -230,28 +206,33 @@ async function initToneAdvanced() {
     }
 }
 
-// Humanização: pequenas variações de tempo
-function humanizeTime(baseTime) {
-    return baseTime + (Math.random() * 0.02 - 0.01); // ±10ms
-}
+function humanizeTime(baseTime) { return baseTime + (Math.random() * 0.02 - 0.01); }
+function humanizeVelocity() { return 0.75 + Math.random() * 0.2; }
 
-// Humanização: variação de velocidade
-function humanizeVelocity() {
-    return 0.75 + Math.random() * 0.2;
-}
-
-// Ativa áudio (DEVE ser chamada após clique do usuário)
 async function activateAudio() {
     if (window.Tone && Tone.context && Tone.context.state !== 'running') {
         try {
             await Tone.start();
             console.log('✅ Tone.js started');
             if (!toneReady) await initToneAdvanced();
-        } catch(e) {
-            console.warn('Erro ao iniciar Tone:', e);
+        } catch(e) { console.warn('Erro ao iniciar Tone:', e); }
+    } else if (!toneReady) { await initToneAdvanced(); }
+}
+
+// ==================== NOTA PREVIEW (teclado virtual) ====================
+async function playNotePreview(midiNote, duration = 0.5) {
+    try {
+        await activateAudio();
+        if (!toneReady) await initToneAdvanced();
+        
+        const now = Tone.now();
+        const noteName = Tone.Frequency(midiNote, "midi").toNote();
+        
+        if (synthCP) {
+            synthCP.triggerAttackRelease(noteName, duration, now, 0.7);
         }
-    } else if (!toneReady) {
-        await initToneAdvanced();
+    } catch(e) {
+        console.warn('Preview falhou:', e);
     }
 }
 
@@ -283,85 +264,57 @@ function numberToNote(num) {
     return notes[num % 12] + '/' + octave;
 }
 
-// ==================== PLAYBACK TONE.JS MELHORADO ====================
+function vexToMidi(vexNote) { return noteToNumber(vexNote) - 12; }
+
+// ==================== DIREÇÃO DAS HASTES (correta por nota) ====================
+function getStemDirection(vexNote, clef) {
+    const notaNum = noteToNumber(vexNote);
+    const refNote = (clef === 'treble') ? 'b/4' : 'd/3';
+    const refNum = noteToNumber(refNote);
+    // Nota na 3ª linha ou acima → haste para baixo (-1)
+    // Nota abaixo da 3ª linha → haste para cima (+1)
+    return (notaNum >= refNum) ? -1 : 1;
+}
+
+// ==================== PLAYBACK TONE.JS ====================
 async function playScoreTone(cantus, contraponto) {
     try {
         await activateAudio();
-        
-        if (!toneReady) {
-            console.warn('Tone.js não está pronto, tentando novamente...');
-            await initToneAdvanced();
-            if (!toneReady) throw new Error('Falha ao inicializar áudio');
-        }
+        if (!toneReady) { await initToneAdvanced(); if (!toneReady) throw new Error('Falha ao inicializar áudio'); }
 
         const now = Tone.now();
         const durMap = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25 };
-        
-        // Escolhe o tipo de instrumento baseado no select
         const instrumentType = document.getElementById('instrument-select')?.value || 'fm';
         
-        // Recria os sintetizadores com o timbre escolhido
         if (instrumentType === 'fm') {
-            synthCantus.set({
-                harmonicity: 2,
-                modulationIndex: 3
-            });
-            synthCP.set({
-                harmonicity: 1.5,
-                modulationIndex: 2
-            });
+            synthCantus.set({ harmonicity: 2, modulationIndex: 3 });
+            synthCP.set({ harmonicity: 1.5, modulationIndex: 2 });
         } else if (instrumentType === 'am') {
-            synthCantus.set({
-                harmonicity: 1,
-                modulationIndex: 1
-            });
+            synthCantus.set({ harmonicity: 1, modulationIndex: 1 });
         } else {
-            synthCantus.set({
-                harmonicity: 3,
-                modulationIndex: 4
-            });
+            synthCantus.set({ harmonicity: 3, modulationIndex: 4 });
         }
 
-        // 🎼 Cantus (voz superior)
         let tC = 0;
         (cantus || []).forEach(n => {
             const dur = durMap[n.duration] || 1;
-            const noteName = n.note.replace('/', '');
-            
-            synthCantus.triggerAttackRelease(
-                noteName,
-                dur,
-                humanizeTime(now + tC),
-                humanizeVelocity()
-            );
+            synthCantus.triggerAttackRelease(n.note.replace('/', ''), dur, humanizeTime(now + tC), humanizeVelocity());
             tC += dur;
         });
 
-        // 🎼 Contraponto (voz inferior)
         let tCP = 0;
         (contraponto || []).forEach(n => {
             const dur = durMap[n.duration] || 1;
-            const noteName = n.note.replace('/', '');
-            
-            synthCP.triggerAttackRelease(
-                noteName,
-                dur * 0.9,  // levemente mais curto para articulação
-                humanizeTime(now + tCP),
-                humanizeVelocity() * 0.9
-            );
+            synthCP.triggerAttackRelease(n.note.replace('/', ''), dur * 0.9, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
             tCP += dur;
         });
-
     } catch (e) {
         console.warn('Tone.js playback falhou:', e);
         setAudioStatus("⚠️ Clique novamente para ativar o áudio", true);
     }
 }
 
-// Função de playback unificada (agora só Tone.js)
-async function playScore(cantus, contraponto) {
-    await playScoreTone(cantus, contraponto);
-}
+async function playScore(cantus, contraponto) { await playScoreTone(cantus, contraponto); }
 
 // ==================== CONFIGURAÇÕES GLOBAIS ====================
 const tratamentosPorEspecie = {
@@ -718,9 +671,21 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             conn.setType(Vex.Flow.StaveConnector.type.SINGLE_LEFT);
             conn.setContext(context).draw();
         }
-        function criarStaveNotes(notasComp, clef, stemDir) {
-            return notasComp.map(n => { try { return new Vex.Flow.StaveNote({ keys: [n.note], duration: n.duration, clef: clef, stem_direction: stemDir }); } catch(e) { return null; } }).filter(Boolean);
+        
+        function criarStaveNotes(notasComp, clef) {
+            return notasComp.map(n => {
+                try {
+                    const stemDir = getStemDirection(n.note, clef);
+                    return new Vex.Flow.StaveNote({
+                        keys: [n.note],
+                        duration: n.duration,
+                        clef: clef,
+                        stem_direction: stemDir
+                    });
+                } catch(e) { return null; }
+            }).filter(Boolean);
         }
+        
         function desenharVoz(staveNotes, stave, temposReais) {
             if (staveNotes.length === 0) return;
             const voice = new Vex.Flow.Voice({ num_beats: 4, note_value: 4 });
@@ -729,11 +694,11 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             new Vex.Flow.Formatter().joinVoices([voice]).formatToStave([voice], stave);
             voice.draw(context, stave);
         }
-        const STEM_UP = 1, STEM_DOWN = -1;
+        
         for (let i = 0; i < numCompassos; i++) {
             const notasC = ccantus[i] || [], notasCP = ccp[i] || [];
-            const snotesC = criarStaveNotes(notasC, cantusClef, STEM_UP);
-            const snotesCP = criarStaveNotes(notasCP, clefContra, STEM_DOWN);
+            const snotesC = criarStaveNotes(notasC, cantusClef);
+            const snotesCP = criarStaveNotes(notasCP, clefContra);
             const temposC = notasC.reduce((s,n) => s + (duracaoMap[n.duration] || 0), 0);
             const temposCP = notasCP.reduce((s,n) => s + (duracaoMap[n.duration] || 0), 0);
             desenharVoz(snotesC, stavesC[i], temposC);
@@ -756,9 +721,13 @@ function initPiano() {
             key.innerHTML = `${note.replace('#','♯')}${octave}`;
             key.onclick = () => {
                 activateAudio();
+                const vexNote = usuarioParaVexFlow(note, octave);
+                const midiNote = vexToMidi(vexNote);
+                playNotePreview(midiNote, 0.5);
+                
                 const q = questions[currentQuestionIndex];
                 if (q && q.tipo === 'c') {
-                    userContraponto.push({ note: usuarioParaVexFlow(note, octave), duration: selectedDuration });
+                    userContraponto.push({ note: vexNote, duration: selectedDuration });
                     updateNotesList();
                     drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
                 }
@@ -942,7 +911,7 @@ const clr = document.getElementById('clear-all-notes'); if (clr) clr.onclick = c
 loadHistory();
 initPiano();
 setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio profissional");
-console.log('✅ Sistema de Contraponto carregado - Modo Simplificado com Tone.js');
+console.log('✅ Sistema de Contraponto carregado - v26.04.16');
 </script>
 </body>
 </html>
