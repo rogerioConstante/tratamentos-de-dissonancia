@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v26.04.15</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v26.04.16</title>
 
     <!-- BIBLIOTECAS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="./libs/vexflow.js"></script>
+    <script src="./libs/Tone.js"></script>
+    <script src="./libs/html2canvas.min.js"></script>
+    <script src="./libs/jspdf.umd.min.js"></script>
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -91,7 +91,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Contraponto & Dissonâncias</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.15</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.16</div>
     </div>
 
     <div class="config-panel">
@@ -118,6 +118,7 @@
                 <option value="fm">🎹 Piano (FM)</option>
                 <option value="am">🎻 Cordas (AM)</option>
                 <option value="synth">🎚️ Synth</option>
+                <option value="sampler">🎹 Piano Real</option>
             </select>
             <span id="audio-status">🎧 Clique em qualquer botão para ativar o áudio</span>
         </div>
@@ -170,6 +171,7 @@ let synthCantus = null;
 let synthCP = null;
 let toneReverb = null;
 let toneChorus = null;
+let samplerPiano = null;
 
 function setAudioStatus(msg, isWarn = false) {
     console.log(isWarn ? "⚠️ " + msg : "✅ " + msg);
@@ -185,7 +187,7 @@ async function initToneAdvanced() {
     try {
         await Tone.start();
         setAudioStatus("🎧 Áudio ativado! ✅");
-        
+
         toneReverb = new Tone.Reverb({ decay: 2.5, wet: 0.25 }).toDestination();
         toneChorus = new Tone.Chorus(4, 2.5, 0.2).connect(toneReverb).start();
 
@@ -200,6 +202,36 @@ async function initToneAdvanced() {
 
         toneReady = true;
         setAudioStatus("🎹 Motor de áudio pronto! 🎵");
+
+        // Carrega o Sampler em paralelo, sem bloquear os outros instrumentos
+        const amostras = {
+            'C2':'audios/C2v8.mp3',
+            'D#2':'audios/D#2v8.mp3',
+            'F#2':'audios/F#2v8.mp3',
+            'A2':'audios/A2v8.mp3',
+            'C3':'audios/C3v8.mp3',
+            'D#3':'audios/D#3v8.mp3',
+            'F#3':'audios/F#3v8.mp3',
+            'A3':'audios/A3v8.mp3',
+            'C4':'audios/C4v8.mp3',
+            'D#4':'audios/D#4v8.mp3',
+            'F#4':'audios/F#4v8.mp3',
+            'A4':'audios/A4v8.mp3',
+            'C5':'audios/C5v8.mp3',
+            'D#5':'audios/D#5v8.mp3',
+            'F#5':'audios/F#5v8.mp3',
+            'A5':'audios/A5v8.mp3',
+            'C6':'audios/C6v8.mp3',
+            'D#6':'audios/D#6v8.mp3',
+            'F#6':'audios/F#6v8.mp3',
+            'A6':'audios/A6v8.mp3',
+        };
+        samplerPiano = new Tone.Sampler({
+            urls: amostras,
+            onload: () => setAudioStatus("🎹 Piano Real carregado! 🎵"),
+            onerror: (e) => console.warn('Sampler: erro ao carregar amostra', e)
+        }).connect(toneReverb);
+
     } catch (e) {
         console.error('Erro ao iniciar Tone.js:', e);
         setAudioStatus("⚠️ Erro no áudio, mas o exercício continua funcionando", true);
@@ -225,11 +257,14 @@ async function playNotePreview(midiNote, duration = 0.5) {
     try {
         await activateAudio();
         if (!toneReady) await initToneAdvanced();
-        
         const now = Tone.now();
         const noteName = Tone.Frequency(midiNote, "midi").toNote();
-        
-        if (synthCP) {
+        const instrumentType = document.getElementById('instrument-select')?.value || 'fm';
+        if (instrumentType === 'sampler') {
+            if (samplerPiano && samplerPiano.loaded) {
+                samplerPiano.triggerAttackRelease(noteName, duration, now, 0.7);
+            }
+        } else if (synthCP) {
             synthCP.triggerAttackRelease(noteName, duration, now, 0.7);
         }
     } catch(e) {
@@ -239,62 +274,35 @@ async function playNotePreview(midiNote, duration = 0.5) {
 
 // ==================== MAPEAMENTO DE NOTAS ====================
 const NOTES_SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-const NOTES_FLAT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const NOTES_FLAT  = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
 
-// Mapeamento enarmônico para exibição baseado na tonalidade
-function getPreferredNoteName(noteNameSharp, tonalityName) {
-    if (!noteNameSharp.includes('#')) return noteNameSharp;
-    
-    const sharpToFlat = {
-        'C#': 'Db',
-        'D#': 'Eb',
-        'F#': 'Gb',
-        'G#': 'Ab',
-        'A#': 'Bb'
-    };
-    
-    const flatKeys = ['F Maior', 'Bb Maior', 'Eb Maior', 'Ab Maior', 'Db Maior',
-                      'D Menor', 'G Menor', 'C Menor', 'F Menor', 'Bb Menor'];
-    
-    if (flatKeys.includes(tonalityName) && sharpToFlat[noteNameSharp]) {
-        return sharpToFlat[noteNameSharp];
-    }
-    
-    return noteNameSharp;
-}
+// Array cromático com os nomes corretos para a tonalidade atual (minúsculas, para VexFlow).
+// Definido em generateRandomTonality() e usado por noteToNumber/numberToNote.
+let currentNoteNames = ['c','c#','d','d#','e','f','f#','g','g#','a','a#','b'];
 
 function usuarioParaVexFlow(notaUsuario, octaveUsuario) {
-    const notesMapSharp = {'C':'c','C#':'c#','D':'d','D#':'d#','E':'e','F':'f','F#':'f#','G':'g','G#':'g#','A':'a','A#':'a#','B':'b'};
-    
-    let normalizedNote = notaUsuario;
-    const flatToSharp = {'Db':'C#','Eb':'D#','Gb':'F#','Ab':'G#','Bb':'A#'};
-    if (flatToSharp[notaUsuario]) normalizedNote = flatToSharp[notaUsuario];
-    
-    const vexNote = notesMapSharp[normalizedNote] || normalizedNote.toLowerCase();
-    return vexNote + '/' + (parseInt(octaveUsuario) + 1);
+    // O nome já vem correto (com b ou # conforme a tonalidade); só passa para minúsculas.
+    return notaUsuario.toLowerCase() + '/' + (parseInt(octaveUsuario) + 1);
 }
 
-function vexFlowParaUsuario(vexNota, tonalityName = null) {
+function vexFlowParaUsuario(vexNota) {
     const [note, octave] = vexNota.split('/');
-    const mapSharp = {'c':'C','c#':'C#','d':'D','d#':'D#','e':'E','f':'F','f#':'F#','g':'G','g#':'G#','a':'A','a#':'A#','b':'B'};
-    let noteName = mapSharp[note.toLowerCase()] || note.toUpperCase();
-    
-    const currentTonality = tonalityName || currentTonalityName;
-    noteName = getPreferredNoteName(noteName, currentTonality);
-    
+    // Busca o nome com capitalização correta em currentNoteNames
+    const match = currentNoteNames.find(n => n === note.toLowerCase());
+    const noteName = match
+        ? match.charAt(0).toUpperCase() + match.slice(1)
+        : note.charAt(0).toUpperCase() + note.slice(1);
     return { note: noteName, octave: parseInt(octave) - 1 };
 }
 
 function noteToNumber(vexNote) {
-    const notes = ['c','c#','d','d#','e','f','f#','g','g#','a','a#','b'];
     const [note, octave] = vexNote.split('/');
-    return (parseInt(octave) + 1) * 12 + notes.indexOf(note.toLowerCase());
+    return (parseInt(octave) + 1) * 12 + currentNoteNames.indexOf(note.toLowerCase());
 }
 
 function numberToNote(num) {
-    const notes = ['c','c#','d','d#','e','f','f#','g','g#','a','a#','b'];
     const octave = Math.floor(num / 12) - 1;
-    return notes[num % 12] + '/' + octave;
+    return currentNoteNames[num % 12] + '/' + octave;
 }
 
 function vexToMidi(vexNote) { return noteToNumber(vexNote) - 12; }
@@ -316,7 +324,29 @@ async function playScoreTone(cantus, contraponto) {
         const now = Tone.now();
         const durMap = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25 };
         const instrumentType = document.getElementById('instrument-select')?.value || 'fm';
-        
+
+        if (instrumentType === 'sampler') {
+            if (!samplerPiano || !samplerPiano.loaded) {
+                setAudioStatus("⏳ Aguarde — amostras ainda carregando...", true);
+                return;
+            }
+            let tC = 0;
+            (cantus || []).forEach(n => {
+                const dur = durMap[n.duration] || 1;
+                const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
+                samplerPiano.triggerAttackRelease(noteName, dur * 0.95, humanizeTime(now + tC), humanizeVelocity());
+                tC += dur;
+            });
+            let tCP = 0;
+            (contraponto || []).forEach(n => {
+                const dur = durMap[n.duration] || 1;
+                const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
+                samplerPiano.triggerAttackRelease(noteName, dur * 0.9, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
+                tCP += dur;
+            });
+            return;
+        }
+
         if (instrumentType === 'fm') {
             synthCantus.set({ harmonicity: 2, modulationIndex: 3 });
             synthCP.set({ harmonicity: 1.5, modulationIndex: 2 });
@@ -332,7 +362,6 @@ async function playScoreTone(cantus, contraponto) {
             synthCantus.triggerAttackRelease(n.note.replace('/', ''), dur, humanizeTime(now + tC), humanizeVelocity());
             tC += dur;
         });
-
         let tCP = 0;
         (contraponto || []).forEach(n => {
             const dur = durMap[n.duration] || 1;
@@ -418,12 +447,15 @@ function generateScale(tonic, type, preferFlats = false) {
 }
 
 function generateRandomTonality() {
-    const tonality = TONALITIES[Math.floor(Math.random() * TONALITIES.length)];
+    const majors = TONALITIES.filter(t => t.type === 'major');
+    const tonality = majors[Math.floor(Math.random() * majors.length)];
     currentTonalityName = tonality.name;
     currentTonality = tonality.tonic;
     currentPreferFlats = tonality.preferFlats;
+    // Array cromático com os nomes corretos para esta tonalidade (minúsculas)
+    currentNoteNames = (tonality.preferFlats ? NOTES_FLAT : NOTES_SHARP).map(n => n.toLowerCase());
     currentScaleUpper = generateScale(tonality.tonic, tonality.type, tonality.preferFlats);
-    currentScale = currentScaleUpper.map(n => n.toLowerCase().replace('b', 'b'));
+    currentScale = currentScaleUpper.map(n => n.toLowerCase());
     const td = document.getElementById('tonality-display');
     if (td) td.innerText = currentTonalityName;
     return currentTonalityName;
@@ -466,15 +498,7 @@ function scaleStep(vexNote, steps) {
     while (remaining > 0) {
         current += dir;
         const noteName = numberToNote(current).split('/')[0];
-        const isInScale = currentScale.some(scaleNote => 
-            scaleNote.toLowerCase() === noteName.toLowerCase() ||
-            (scaleNote === 'bb' && noteName === 'a#') ||
-            (scaleNote === 'eb' && noteName === 'd#') ||
-            (scaleNote === 'ab' && noteName === 'g#') ||
-            (scaleNote === 'db' && noteName === 'c#') ||
-            (scaleNote === 'gb' && noteName === 'f#')
-        );
-        if (isInScale) remaining--;
+        if (currentScale.includes(noteName)) remaining--;
     }
     return numberToNote(current);
 }
@@ -495,10 +519,10 @@ function generateCantusFirmus(isUpperVoice) {
     do {
         const note1 = currentScale[Math.floor(Math.random() * currentScale.length)];
         const oct1 = octMin + Math.floor(Math.random() * (octMax - octMin + 1));
-        n1 = note1.toLowerCase().replace('b', 'b') + '/' + oct1;
+        n1 = note1 + '/' + oct1;
         const note2 = currentScale[Math.floor(Math.random() * currentScale.length)];
         const oct2 = octMin + Math.floor(Math.random() * (octMax - octMin + 1));
-        n2 = note2.toLowerCase().replace('b', 'b') + '/' + oct2;
+        n2 = note2 + '/' + oct2;
         const diff = Math.abs(noteToNumber(n1) - noteToNumber(n2));
         attempts++;
         if (diff !== 10 && diff !== 11 && diff <= 12) break;
@@ -532,15 +556,7 @@ function gerarContraponto2aEspecie(tratamento, cantusNotes, isUpperVoice) {
     for (let num = rangeMin; num <= rangeMax; num++) {
         const vex = numberToNote(num);
         const noteName = vex.split('/')[0];
-        const isInScale = currentScale.some(scaleNote => 
-            scaleNote.toLowerCase() === noteName.toLowerCase() ||
-            (scaleNote === 'bb' && noteName === 'a#') ||
-            (scaleNote === 'eb' && noteName === 'd#') ||
-            (scaleNote === 'ab' && noteName === 'g#') ||
-            (scaleNote === 'db' && noteName === 'c#') ||
-            (scaleNote === 'gb' && noteName === 'f#')
-        );
-        if (!isInScale) continue;
+        if (!currentScale.includes(noteName)) continue;
         if (isConsonant(num - s1)) candidatos.push(vex);
     }
     if (candidatos.length === 0) return null;
@@ -667,33 +683,49 @@ function generateQuestions() {
     const tratamentos = [...tratamentosPorEspecie[currentSpecies]];
     const tratamentosParaGerar = [...tratamentosGeraveis[currentSpecies]];
     const tipoA = [], tipoB = [], tipoC = [];
+    const assinaturasUsadas = new Set();
+
     for (let i = 0; i < 4; i++) {
         const tratamento = tratamentosParaGerar[i % tratamentosParaGerar.length];
         const isUpperVoice = Math.random() > 0.5;
         const cantusPosition = isUpperVoice ? 'superior' : 'inferior';
         const cantusClef = isUpperVoice ? 'treble' : 'bass';
-        const par = gerarParValido(tratamento, isUpperVoice, 20);
-        if (!par.success) { console.warn(`⚠️ Pulando questão para tratamento "${tratamento}"`); continue; }
+        let par = null;
+        for (let t = 0; t < 40; t++) {
+            const tentativa = gerarParValido(tratamento, isUpperVoice, 20);
+            if (!tentativa.success) continue;
+            const { cantus, contraponto } = tentativa;
+            const sig = cantus.map(n => n.note).join('|') + '||' + contraponto.map(n => n.note).join('|');
+            if (assinaturasUsadas.has(sig)) continue;
+            assinaturasUsadas.add(sig);
+            par = tentativa;
+            break;
+        }
+        if (!par) { console.warn(`⚠️ Pulando questão para tratamento "${tratamento}"`); continue; }
         const { cantus, contraponto } = par;
         tipoA.push({ id: `a${i}`, tipo: 'a', enunciado: 'Identifique <strong>auditivamente</strong> o tratamento de dissonância utilizado:', tratamento, resposta: tratamento, cantus, contraponto, cantusPosition, cantusClef });
         tipoB.push({ id: `b${i}`, tipo: 'b', enunciado: 'Analise a <strong>partitura</strong> e classifique o tratamento de dissonância:', tratamento, resposta: tratamento, partitura: { cantus, contraponto, cantusPosition, cantusClef } });
     }
+
     const tratamentosC = tratamentos.filter(t => t !== 'D - Sem Dissonâncias');
     for (let i = 0; i < 4; i++) {
         const tratamentoC = tratamentosC[i % tratamentosC.length];
         let parValido = null;
-        let tentativasC = 0;
-        while (!parValido && tentativasC < 20) {
+        for (let t = 0; t < 40; t++) {
             const isUpperC = Math.random() > 0.5;
             const testPar = gerarParValido(tratamentoC, isUpperC, 1);
-            if (testPar.success) parValido = { isUpperVoice: isUpperC, cantus: testPar.cantus };
-            tentativasC++;
+            if (!testPar.success) continue;
+            // Para tipo C o contraponto é do aluno: unicidade só pelo cantus
+            const sigC = testPar.cantus.map(n => n.note).join('|');
+            if (assinaturasUsadas.has(sigC)) continue;
+            assinaturasUsadas.add(sigC);
+            parValido = { isUpperVoice: isUpperC, cantus: testPar.cantus };
+            break;
         }
-        if (!parValido) { console.error(`❌ Não foi possível gerar cantus viável para tipo C com tratamento "${tratamentoC}"`); continue; }
-        const isUpperC = parValido.isUpperVoice;
-        const cantusC = parValido.cantus;
-        tipoC.push({ id: `c${i}`, tipo: 'c', enunciado: `Escreva uma dissonância do tipo <strong>"${tratamentoC}"</strong> no contraponto — use a estrutura rítmica: <strong>mínima · mínima · semibreve</strong> (use o teclado abaixo):`, tratamento: tratamentoC, resposta: tratamentoC, cantus: cantusC, cantusPosition: isUpperC ? 'superior' : 'inferior', cantusClef: isUpperC ? 'treble' : 'bass', contrapontoEsperado: null });
+        if (!parValido) { console.error(`❌ Não foi possível gerar cantus único para tipo C com tratamento "${tratamentoC}"`); continue; }
+        tipoC.push({ id: `c${i}`, tipo: 'c', enunciado: `Escreva uma dissonância do tipo <strong>"${tratamentoC}"</strong> no contraponto — use a estrutura rítmica: <strong>mínima · mínima · semibreve</strong> (use o teclado abaixo):`, tratamento: tratamentoC, resposta: tratamentoC, cantus: parValido.cantus, cantusPosition: parValido.isUpperVoice ? 'superior' : 'inferior', cantusClef: parValido.isUpperVoice ? 'treble' : 'bass', contrapontoEsperado: null });
     }
+
     let all = [...tipoA, ...tipoB, ...tipoC];
     for (let i = all.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [all[i], all[j]] = [all[j], all[i]]; }
     return all;
@@ -816,24 +848,23 @@ function initPiano() {
     container.innerHTML = '';
     const oitavas = [1, 2, 3, 4, 5];
     oitavas.forEach(octave => {
-        NOTES_SHARP.forEach(note => {
-            const isBlack = note.includes('#');
+        currentNoteNames.forEach((note, idx) => {
+            const isBlack = note.includes('#') || note.includes('b') && note.length > 1;
             const key = document.createElement('div');
             key.className = 'piano-key' + (isBlack ? ' black' : '');
-            
-            key.setAttribute('data-note-sharp', note);
+            key.setAttribute('data-note-idx', idx);
             key.setAttribute('data-octave', octave);
-            
+            const displayName = note.charAt(0).toUpperCase() + note.slice(1);
+            key.innerHTML = displayName.replace('#','♯').replace(/b$/,'♭') + octave;
             key.onclick = () => {
                 if (key.classList.contains('out-of-scale')) {
                     showFeedback('⚠️ Esta nota não pertence à escala atual!', false);
                     return;
                 }
                 activateAudio();
-                const vexNote = usuarioParaVexFlow(note, octave);
+                const vexNote = note + '/' + (parseInt(octave) + 1);
                 const midiNote = vexToMidi(vexNote);
                 playNotePreview(midiNote, 0.5);
-                
                 const q = questions[currentQuestionIndex];
                 if (q && q.tipo === 'c' && !questionAnswered) {
                     userContraponto.push({ note: vexNote, duration: selectedDuration });
@@ -850,24 +881,12 @@ function initPiano() {
 function refreshPianoHighlight() {
     const keys = document.querySelectorAll('.piano-key');
     keys.forEach(key => {
-        const noteSharp = key.getAttribute('data-note-sharp');
+        const idx = parseInt(key.getAttribute('data-note-idx'));
+        const note = currentNoteNames[idx];
         const octave = key.getAttribute('data-octave');
-        
-        let displayName = getPreferredNoteName(noteSharp, currentTonalityName);
-        key.innerHTML = `${displayName.replace('#','♯').replace('b','♭')}${octave}`;
-        
-        const noteInScale = currentScaleUpper.some(scaleNote => {
-            const scaleNoteClean = scaleNote.replace('b', 'b');
-            const noteSharpClean = noteSharp;
-            return scaleNoteClean === noteSharpClean ||
-                   (scaleNoteClean === 'Bb' && noteSharpClean === 'A#') ||
-                   (scaleNoteClean === 'Eb' && noteSharpClean === 'D#') ||
-                   (scaleNoteClean === 'Ab' && noteSharpClean === 'G#') ||
-                   (scaleNoteClean === 'Db' && noteSharpClean === 'C#') ||
-                   (scaleNoteClean === 'Gb' && noteSharpClean === 'F#');
-        });
-        
-        if (noteInScale) {
+        const displayName = note.charAt(0).toUpperCase() + note.slice(1);
+        key.innerHTML = displayName.replace('#','♯').replace(/b$/,'♭') + octave;
+        if (currentScale.includes(note)) {
             key.classList.remove('out-of-scale');
         } else {
             key.classList.add('out-of-scale');
@@ -884,7 +903,7 @@ function updateNotesList() {
         const span = document.createElement('span');
         span.className = 'note-item';
         const durDisplay = { 'w':'𝅜', 'h':'𝅗𝅥', 'q':'♩', '8':'♪' }[nota.duration] || nota.duration;
-        const nu = vexFlowParaUsuario(nota.note, currentTonalityName);
+        const nu = vexFlowParaUsuario(nota.note);
         span.innerHTML = `${durDisplay} ${nu.note}${nu.octave}`;
         span.title = 'Clique para remover';
         span.onclick = () => { 
@@ -1259,7 +1278,7 @@ function startExercise() {
     startTimePerf = performance.now();
     startTimeDate = new Date();
     
-    refreshPianoHighlight();
+    initPiano();
     renderCurrentQuestion();
     
     const sb = document.getElementById('start-btn'); 
@@ -1281,7 +1300,7 @@ const clr = document.getElementById('clear-all-notes'); if (clr) clr.onclick = c
 loadHistory();
 initPiano();
 setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
-console.log('✅ Sistema de Contraponto carregado - v26.04.15');
+console.log('✅ Sistema de Contraponto carregado - v26.04.16');
 </script>
 </body>
 </html>
