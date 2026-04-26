@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v26.04.14</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v26.04.15</title>
 
     <!-- BIBLIOTECAS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
@@ -43,7 +43,7 @@
         .enunciado-actions button { padding: 8px 14px; font-size: 13px; white-space: nowrap; }
         .score-area { background: #404040; padding: 20px; border-radius: 8px; margin-bottom: 25px; text-align: center; overflow-x: auto; }
         #notation-canvas { background: #ffffff; border-radius: 5px; margin: 0 auto; display: block; max-width: 100%; height: auto; }
-        .virtual-piano { background: #1e1e1e; padding: 20px; border-radius: 8px; margin: 20px 0; display: none; }
+        .virtual-piano { background: #1e1e1e; padding: 20px; border-radius: 8px; margin: 20px 0; display: none; transition: opacity 0.3s; }
         .virtual-piano h4 { color: #3a6ea5; margin-bottom: 10px; font-size: 14px; }
         .duration-controls { display: flex; gap: 10px; justify-content: center; margin: 15px 0; flex-wrap: wrap; }
         .duration-btn { background: #2d2d2d; padding: 8px 16px; font-size: 12px; border: 1px solid #3a3a3a; }
@@ -52,7 +52,6 @@
         .piano-keys { display: flex; justify-content: center; gap: 1px; margin: 15px 0; position: relative; flex-wrap: wrap; max-height: 180px; overflow-y: auto; }
         .piano-key { width: 32px; height: 100px; background: white; border: 1px solid #333; border-radius: 0 0 3px 3px; cursor: pointer; transition: all 0.1s; position: relative; z-index: 0; font-size: 8px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px; color: #333; }
         .piano-key.black { width: 22px; height: 60px; background: #333; color: white; margin-left: -11px; margin-right: -11px; z-index: 1; }
-        .piano-key.in-scale { border: 3px solid #4da87a; box-shadow: 0 0 8px #4da87a; font-weight: bold; }
         .piano-key.out-of-scale { opacity: 0.35; cursor: not-allowed; }
         .piano-key:hover { background: #ddd; transform: scale(0.98); }
         .piano-key.black:hover { background: #555; }
@@ -92,7 +91,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Contraponto & Dissonâncias</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.14</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.15</div>
     </div>
 
     <div class="config-panel">
@@ -244,10 +243,8 @@ const NOTES_FLAT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
 
 // Mapeamento enarmônico para exibição baseado na tonalidade
 function getPreferredNoteName(noteNameSharp, tonalityName) {
-    // Se for uma nota sem acidente, retorna ela mesma
     if (!noteNameSharp.includes('#')) return noteNameSharp;
     
-    // Mapeamento de sustenido para bemol quando a tonalidade pede bemóis
     const sharpToFlat = {
         'C#': 'Db',
         'D#': 'Eb',
@@ -256,7 +253,6 @@ function getPreferredNoteName(noteNameSharp, tonalityName) {
         'A#': 'Bb'
     };
     
-    // Tonalidades que usam bemóis (preferem nomes com bemol)
     const flatKeys = ['F Maior', 'Bb Maior', 'Eb Maior', 'Ab Maior', 'Db Maior',
                       'D Menor', 'G Menor', 'C Menor', 'F Menor', 'Bb Menor'];
     
@@ -269,9 +265,7 @@ function getPreferredNoteName(noteNameSharp, tonalityName) {
 
 function usuarioParaVexFlow(notaUsuario, octaveUsuario) {
     const notesMapSharp = {'C':'c','C#':'c#','D':'d','D#':'d#','E':'e','F':'f','F#':'f#','G':'g','G#':'g#','A':'a','A#':'a#','B':'b'};
-    const notesMapFlat = {'C':'c','Db':'c#','D':'d','Eb':'d#','E':'e','F':'f','Gb':'f#','G':'g','Ab':'g#','A':'a','Bb':'a#','B':'b'};
     
-    // Normaliza a nota: se for bemol, converte internamente para sustenido
     let normalizedNote = notaUsuario;
     const flatToSharp = {'Db':'C#','Eb':'D#','Gb':'F#','Ab':'G#','Bb':'A#'};
     if (flatToSharp[notaUsuario]) normalizedNote = flatToSharp[notaUsuario];
@@ -285,7 +279,6 @@ function vexFlowParaUsuario(vexNota, tonalityName = null) {
     const mapSharp = {'c':'C','c#':'C#','d':'D','d#':'D#','e':'E','f':'F','f#':'F#','g':'G','g#':'G#','a':'A','a#':'A#','b':'B'};
     let noteName = mapSharp[note.toLowerCase()] || note.toUpperCase();
     
-    // Aplica enarmonia baseada na tonalidade atual
     const currentTonality = tonalityName || currentTonalityName;
     noteName = getPreferredNoteName(noteName, currentTonality);
     
@@ -306,7 +299,7 @@ function numberToNote(num) {
 
 function vexToMidi(vexNote) { return noteToNumber(vexNote) - 12; }
 
-// ==================== DIREÇÃO DAS HASTES (correta por nota) ====================
+// ==================== DIREÇÃO DAS HASTES ====================
 function getStemDirection(vexNote, clef) {
     const notaNum = noteToNumber(vexNote);
     const refNote = (clef === 'treble') ? 'b/4' : 'd/3';
@@ -314,7 +307,7 @@ function getStemDirection(vexNote, clef) {
     return (notaNum >= refNum) ? -1 : 1;
 }
 
-// ==================== PLAYBACK TONE.JS ====================
+// ==================== PLAYBACK ====================
 async function playScoreTone(cantus, contraponto) {
     try {
         await activateAudio();
@@ -368,29 +361,25 @@ const tratamentosGeraveis = {
     5: [...tratamentosPorEspecie[5]]
 };
 
-// ==================== NOVAS TONALIDADES (até 5 acidentes) ====================
+// ==================== TONALIDADES (até 5 acidentes) ====================
 const TONALITIES = [
-    // Maiores com sustenidos
     { name: "C Maior", tonic: "C", type: "major", accidentals: 0, preferFlats: false },
     { name: "G Maior", tonic: "G", type: "major", accidentals: 1, preferFlats: false },
     { name: "D Maior", tonic: "D", type: "major", accidentals: 2, preferFlats: false },
     { name: "A Maior", tonic: "A", type: "major", accidentals: 3, preferFlats: false },
     { name: "E Maior", tonic: "E", type: "major", accidentals: 4, preferFlats: false },
     { name: "B Maior", tonic: "B", type: "major", accidentals: 5, preferFlats: false },
-    // Maiores com bemóis
     { name: "F Maior", tonic: "F", type: "major", accidentals: 1, preferFlats: true },
     { name: "Bb Maior", tonic: "Bb", type: "major", accidentals: 2, preferFlats: true },
     { name: "Eb Maior", tonic: "Eb", type: "major", accidentals: 3, preferFlats: true },
     { name: "Ab Maior", tonic: "Ab", type: "major", accidentals: 4, preferFlats: true },
     { name: "Db Maior", tonic: "Db", type: "major", accidentals: 5, preferFlats: true },
-    // Menores com sustenidos
     { name: "A Menor", tonic: "A", type: "minor", accidentals: 0, preferFlats: false },
     { name: "E Menor", tonic: "E", type: "minor", accidentals: 1, preferFlats: false },
     { name: "B Menor", tonic: "B", type: "minor", accidentals: 2, preferFlats: false },
     { name: "F# Menor", tonic: "F#", type: "minor", accidentals: 3, preferFlats: false },
     { name: "C# Menor", tonic: "C#", type: "minor", accidentals: 4, preferFlats: false },
     { name: "G# Menor", tonic: "G#", type: "minor", accidentals: 5, preferFlats: false },
-    // Menores com bemóis
     { name: "D Menor", tonic: "D", type: "minor", accidentals: 1, preferFlats: true },
     { name: "G Menor", tonic: "G", type: "minor", accidentals: 2, preferFlats: true },
     { name: "C Menor", tonic: "C", type: "minor", accidentals: 3, preferFlats: true },
@@ -411,11 +400,9 @@ function getKeySignatureString(tonalityName) {
 function generateScale(tonic, type, preferFlats = false) {
     const intervals = type === 'major' ? [0,2,4,5,7,9,11] : [0,2,3,5,7,8,10];
     
-    // Encontra o índice da tônica no array apropriado
     let notesArray = preferFlats ? NOTES_FLAT : NOTES_SHARP;
     let tonicNormalized = tonic;
     
-    // Converte tônica para o formato do array escolhido
     if (preferFlats) {
         const sharpToFlat = {'C#':'Db','D#':'Eb','F#':'Gb','G#':'Ab','A#':'Bb'};
         tonicNormalized = sharpToFlat[tonic] || tonic;
@@ -425,7 +412,7 @@ function generateScale(tonic, type, preferFlats = false) {
     }
     
     const startIndex = notesArray.indexOf(tonicNormalized);
-    if (startIndex === -1) return ['C','D','E','F','G','A','B']; // fallback
+    if (startIndex === -1) return ['C','D','E','F','G','A','B'];
     
     return intervals.map(i => notesArray[(startIndex + i) % 12]);
 }
@@ -436,10 +423,7 @@ function generateRandomTonality() {
     currentTonality = tonality.tonic;
     currentPreferFlats = tonality.preferFlats;
     currentScaleUpper = generateScale(tonality.tonic, tonality.type, tonality.preferFlats);
-    currentScale = currentScaleUpper.map(n => {
-        // Converte para minúsculas para uso interno, mantendo bemóis
-        return n.toLowerCase().replace('b', 'b');
-    });
+    currentScale = currentScaleUpper.map(n => n.toLowerCase().replace('b', 'b'));
     const td = document.getElementById('tonality-display');
     if (td) td.innerText = currentTonalityName;
     return currentTonalityName;
@@ -454,6 +438,8 @@ let currentScaleUpper = [];
 let questions = [];
 let currentQuestionIndex = 0;
 let userAnswers = [];
+let questionAttempts = [];
+let questionScores = [];
 let startTimePerf = null;
 let startTimeDate = null;
 let endTime = null;
@@ -480,7 +466,6 @@ function scaleStep(vexNote, steps) {
     while (remaining > 0) {
         current += dir;
         const noteName = numberToNote(current).split('/')[0];
-        // Verifica se a nota está na escala (considerando bemóis)
         const isInScale = currentScale.some(scaleNote => 
             scaleNote.toLowerCase() === noteName.toLowerCase() ||
             (scaleNote === 'bb' && noteName === 'a#') ||
@@ -524,7 +509,6 @@ function generateCantusFirmus(isUpperVoice) {
 function hasCruzamento(cpNote, cantusNote, cpAbaixo) {
     const cpNum = noteToNumber(cpNote);
     const cantusNum = noteToNumber(cantusNote);
-    // Uníssono não é considerado cruzamento
     if (cpAbaixo) return cpNum > cantusNum;
     else return cpNum < cantusNum;
 }
@@ -656,15 +640,25 @@ function analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado) {
 }
 
 function validarRespostaEscrita(q) {
+    if (questionAnswered) return;
+    
+    questionAttempts[currentQuestionIndex]++;
+    
     const resultado = analisarContraponto2aEspecie(userContraponto, q.cantus, q.resposta);
+    
     if (resultado.ok) {
-        showFeedback('✅ Correto!', true);
+        const pontuacao = 1 / questionAttempts[currentQuestionIndex];
+        questionScores[currentQuestionIndex] = pontuacao;
         userAnswers[currentQuestionIndex] = q.resposta;
         questionAnswered = true;
+        
+        const percentual = (pontuacao * 100).toFixed(1);
+        showFeedback(`✅ Correto! Pontuação: ${pontuacao.toFixed(2)} (${percentual}%) na ${questionAttempts[currentQuestionIndex]}ª tentativa`, true);
+        
+        setTimeout(() => proceedToNext(), 1000);
     } else {
-        showFeedback(`❌ ${resultado.erro}`, false);
-        userAnswers[currentQuestionIndex] = false;
-        questionAnswered = true;
+        showFeedback(`❌ ${resultado.erro} - Tentativa ${questionAttempts[currentQuestionIndex]}`, false);
+        questionAnswered = false;
     }
 }
 
@@ -827,12 +821,10 @@ function initPiano() {
             const key = document.createElement('div');
             key.className = 'piano-key' + (isBlack ? ' black' : '');
             
-            // Armazena a nota crua (com sustenido) como atributo
             key.setAttribute('data-note-sharp', note);
             key.setAttribute('data-octave', octave);
             
             key.onclick = () => {
-                // Verifica se a tecla está na escala atual
                 if (key.classList.contains('out-of-scale')) {
                     showFeedback('⚠️ Esta nota não pertence à escala atual!', false);
                     return;
@@ -843,7 +835,7 @@ function initPiano() {
                 playNotePreview(midiNote, 0.5);
                 
                 const q = questions[currentQuestionIndex];
-                if (q && q.tipo === 'c') {
+                if (q && q.tipo === 'c' && !questionAnswered) {
                     userContraponto.push({ note: vexNote, duration: selectedDuration });
                     updateNotesList();
                     drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
@@ -861,15 +853,10 @@ function refreshPianoHighlight() {
         const noteSharp = key.getAttribute('data-note-sharp');
         const octave = key.getAttribute('data-octave');
         
-        // Obtém o nome preferido para exibição baseado na tonalidade
         let displayName = getPreferredNoteName(noteSharp, currentTonalityName);
-        
-        // Atualiza o texto da tecla
         key.innerHTML = `${displayName.replace('#','♯').replace('b','♭')}${octave}`;
         
-        // Verifica se a nota está na escala atual
         const noteInScale = currentScaleUpper.some(scaleNote => {
-            // Comparação flexível considerando enarmonia
             const scaleNoteClean = scaleNote.replace('b', 'b');
             const noteSharpClean = noteSharp;
             return scaleNoteClean === noteSharpClean ||
@@ -881,11 +868,9 @@ function refreshPianoHighlight() {
         });
         
         if (noteInScale) {
-            key.classList.add('in-scale');
             key.classList.remove('out-of-scale');
         } else {
             key.classList.add('out-of-scale');
-            key.classList.remove('in-scale');
         }
     });
 }
@@ -902,12 +887,26 @@ function updateNotesList() {
         const nu = vexFlowParaUsuario(nota.note, currentTonalityName);
         span.innerHTML = `${durDisplay} ${nu.note}${nu.octave}`;
         span.title = 'Clique para remover';
-        span.onclick = () => { userContraponto.splice(idx, 1); updateNotesList(); const q = questions[currentQuestionIndex]; if (q && q.tipo === 'c') drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef); };
+        span.onclick = () => { 
+            if (!questionAnswered) {
+                userContraponto.splice(idx, 1); 
+                updateNotesList(); 
+                const q = questions[currentQuestionIndex]; 
+                if (q && q.tipo === 'c') drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
+            }
+        };
         container.appendChild(span);
     });
 }
 
-function clearAllNotes() { userContraponto = []; updateNotesList(); const q = questions[currentQuestionIndex]; if (q && q.tipo === 'c') drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef); }
+function clearAllNotes() { 
+    if (!questionAnswered) {
+        userContraponto = []; 
+        updateNotesList(); 
+        const q = questions[currentQuestionIndex]; 
+        if (q && q.tipo === 'c') drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
+    }
+}
 
 function showFeedback(message, isCorrect) {
     const toast = document.createElement('div');
@@ -919,66 +918,192 @@ function showFeedback(message, isCorrect) {
 }
 
 // ==================== FLUXO DE QUESTÕES ====================
+function updateNextButtonText() {
+    const q = questions[currentQuestionIndex];
+    const nextBtn = document.getElementById('next-btn');
+    if (!nextBtn) return;
+    
+    if (q && q.tipo === 'c' && !questionAnswered) {
+        nextBtn.innerHTML = '✔ Validar contraponto';
+    } else {
+        nextBtn.innerHTML = '⏩ Próxima';
+    }
+}
+
+function handleNextOrValidate() {
+    const q = questions[currentQuestionIndex];
+    
+    if (q && q.tipo === 'c' && !questionAnswered) {
+        if (!userContraponto || userContraponto.length === 0) {
+            showFeedback('⚠️ Nenhuma nota foi inserida no contraponto!', false);
+            return;
+        }
+        
+        if (userContraponto.length !== 3) {
+            showFeedback('⚠️ O contraponto deve ter exatamente 3 notas (mínima, mínima, semibreve)', false);
+            return;
+        }
+        
+        validarRespostaEscrita(q);
+        updateNextButtonText();
+        return;
+    }
+    
+    if (!questionAnswered) {
+        const mm = document.getElementById('modal-message');
+        if (mm) mm.innerHTML = 'Você ainda não respondeu esta questão. Deseja prosseguir mesmo assim?';
+        const modal = document.getElementById('modal');
+        if (modal) modal.style.display = 'flex';
+        
+        const confirmBtn = document.getElementById('modal-confirm');
+        const cancelBtn = document.getElementById('modal-cancel');
+        
+        const confirmHandler = () => {
+            if (modal) modal.style.display = 'none';
+            proceedToNext();
+        };
+        const cancelHandler = () => {
+            if (modal) modal.style.display = 'none';
+        };
+        
+        if (confirmBtn) confirmBtn.onclick = confirmHandler;
+        if (cancelBtn) cancelBtn.onclick = cancelHandler;
+    } else {
+        proceedToNext();
+    }
+}
+
 function renderCurrentQuestion() {
     if (!questions.length || currentQuestionIndex >= questions.length) return;
     const q = questions[currentQuestionIndex];
-    questionAnswered = false;
-    const qt = document.getElementById('question-text'); if (qt) qt.innerHTML = q.enunciado;
-    const pi = document.getElementById('progress-info'); if (pi) pi.innerHTML = `Questão <strong>${currentQuestionIndex+1}</strong> de <strong>${questions.length}</strong> | Tipo: <strong>${q.tipo==='a'?'Auditiva':q.tipo==='b'?'Análise':'Escrita'}</strong> | Espécie: <strong>${currentSpecies}ª</strong> | Tom: <strong>${currentTonalityName}</strong>`;
+    
+    const alreadyAnswered = questionScores[currentQuestionIndex] !== undefined && 
+                           questionScores[currentQuestionIndex] !== null &&
+                           questionScores[currentQuestionIndex] > 0;
+    
+    if (alreadyAnswered && q.tipo === 'c') {
+        questionAnswered = true;
+    } else if (q.tipo !== 'c') {
+        const alreadyAttempted = questionAttempts[currentQuestionIndex] > 0;
+        questionAnswered = alreadyAttempted;
+    } else {
+        questionAnswered = false;
+    }
+    
+    const qt = document.getElementById('question-text'); 
+    if (qt) qt.innerHTML = q.enunciado;
+    const pi = document.getElementById('progress-info'); 
+    if (pi) pi.innerHTML = `Questão <strong>${currentQuestionIndex+1}</strong> de <strong>${questions.length}</strong> | Tipo: <strong>${q.tipo==='a'?'Auditiva':q.tipo==='b'?'Análise':'Escrita'}</strong> | Espécie: <strong>${currentSpecies}ª</strong> | Tom: <strong>${currentTonalityName}</strong>`;
+    
     if (q.tipo === 'a') drawBlankScore(q.cantusPosition, q.cantusClef);
     else if (q.tipo === 'b') drawScore(q.partitura.cantus, q.partitura.contraponto, q.partitura.cantusPosition, q.partitura.cantusClef);
-    else if (q.tipo === 'c') { userContraponto = []; updateNotesList(); drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef); }
-    const pianoDiv = document.getElementById('virtual-piano'); if (pianoDiv) pianoDiv.style.display = q.tipo === 'c' ? 'block' : 'none';
+    else if (q.tipo === 'c') { 
+        if (!alreadyAnswered) userContraponto = []; 
+        updateNotesList(); 
+        drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef); 
+    }
+    
+    const pianoDiv = document.getElementById('virtual-piano'); 
+    if (pianoDiv) {
+        pianoDiv.style.display = q.tipo === 'c' ? 'block' : 'none';
+        if (q.tipo === 'c' && alreadyAnswered) {
+            pianoDiv.style.opacity = '0.5';
+            pianoDiv.style.pointerEvents = 'none';
+        } else if (q.tipo === 'c') {
+            pianoDiv.style.opacity = '1';
+            pianoDiv.style.pointerEvents = 'auto';
+        }
+    }
+    
     const tratamentos = [...tratamentosPorEspecie[currentSpecies]];
-    const container = document.getElementById('alternatives-container'); if (!container) return;
+    const container = document.getElementById('alternatives-container'); 
+    if (!container) return;
     container.innerHTML = '';
+    
     if (q.tipo === 'c') {
-        const btn = document.createElement('button'); btn.className = 'alt-btn success'; btn.innerHTML = '✔ Validar contraponto'; btn.onclick = () => validarRespostaEscrita(q); container.appendChild(btn);
+        container.innerHTML = '<p style="color:#9a9a9a; text-align:center;">✏️ Construa o contraponto usando o teclado acima e clique em "Validar"</p>';
     } else {
         tratamentos.forEach(alt => {
-            const btn = document.createElement('button'); btn.className = 'alt-btn'; if (currentQuestionResponse === alt) btn.classList.add('selected'); btn.innerHTML = alt; btn.disabled = false;
-            btn.onclick = () => checkAnswer(alt, btn, q); container.appendChild(btn);
+            const btn = document.createElement('button'); 
+            btn.className = 'alt-btn'; 
+            if (currentQuestionResponse === alt) btn.classList.add('selected'); 
+            btn.innerHTML = alt; 
+            btn.disabled = questionAnswered;
+            btn.onclick = () => checkAnswer(alt, btn, q); 
+            container.appendChild(btn);
         });
     }
-    const nb = document.getElementById('next-btn'); if (nb) nb.disabled = false;
-    const pb = document.getElementById('play-btn'); if (pb) pb.disabled = false;
-    if (pb) pb.onclick = () => { activateAudio(); if (q.tipo === 'a') playScore(q.cantus, q.contraponto); else if (q.tipo === 'b') playScore(q.partitura.cantus, q.partitura.contraponto); else if (q.tipo === 'c') playScore(q.cantus, userContraponto); };
     
-    // Atualiza o destaque do teclado para a tonalidade atual
+    const nb = document.getElementById('next-btn'); 
+    if (nb) {
+        nb.disabled = false;
+        nb.onclick = handleNextOrValidate;
+    }
+    updateNextButtonText();
+    
+    const pb = document.getElementById('play-btn'); 
+    if (pb) {
+        pb.disabled = false;
+        pb.onclick = () => { 
+            activateAudio(); 
+            if (q.tipo === 'a') playScore(q.cantus, q.contraponto); 
+            else if (q.tipo === 'b') playScore(q.partitura.cantus, q.partitura.contraponto); 
+            else if (q.tipo === 'c') playScore(q.cantus, userContraponto); 
+        };
+    }
+    
     refreshPianoHighlight();
 }
 
 function checkAnswer(choice, btn, q) {
     if (questionAnswered) return;
-    questionAnswered = true;
+    
+    questionAttempts[currentQuestionIndex] = 1;
     const isCorrect = choice === q.resposta;
-    userAnswers[currentQuestionIndex] = choice;
-    currentQuestionResponse = choice;
-    document.querySelectorAll('.alt-btn').forEach(b => { b.disabled = true; if (b.innerHTML === q.resposta) b.classList.add('correct'); });
-    if (!isCorrect) btn.classList.add('wrong');
-    showFeedback(isCorrect ? '✅ Correto!' : `❌ Incorreto. A resposta correta era: "${q.resposta}"`, isCorrect);
-    if (q.tipo === 'a') drawScore(q.cantus, q.contraponto, q.cantusPosition, q.cantusClef);
-    if (currentQuestionIndex === questions.length - 1) setTimeout(endExercise, 1200);
-}
+    
+    if (isCorrect) {
+        const pontuacao = 1.0;
+        questionScores[currentQuestionIndex] = pontuacao;
+        userAnswers[currentQuestionIndex] = choice;
+        questionAnswered = true;
+        
+        const percentual = (pontuacao * 100).toFixed(0);
+        showFeedback(`✅ Correto! Pontuação: ${pontuacao.toFixed(0)} (${percentual}%)`, true);
+        
+        if (currentQuestionIndex === questions.length - 1) setTimeout(endExercise, 1200);
+    } else {
+        questionScores[currentQuestionIndex] = 0;
+        userAnswers[currentQuestionIndex] = false;
+        questionAnswered = true;
+        
+        showFeedback(`❌ Incorreto. A resposta correta era: "${q.resposta}"`, false);
+        
+        btn.classList.add('wrong');
 
-function nextQuestion() {
-    const q = questions[currentQuestionIndex];
-    if (!questionAnswered && q && q.tipo !== 'c') {
-        const mm = document.getElementById('modal-message'); if (mm) mm.innerHTML = 'Você ainda não respondeu esta questão. Deseja prosseguir mesmo assim?';
-        const modal = document.getElementById('modal'); if (modal) modal.style.display = 'flex';
-        const confirmBtn = document.getElementById('modal-confirm'); const cancelBtn = document.getElementById('modal-cancel');
-        const confirmHandler = () => { if (modal) modal.style.display = 'none'; proceedToNext(); };
-        const cancelHandler = () => { if (modal) modal.style.display = 'none'; };
-        if (confirmBtn) confirmBtn.onclick = confirmHandler;
-        if (cancelBtn) cancelBtn.onclick = cancelHandler;
-        return;
+        if (currentQuestionIndex === questions.length - 1) setTimeout(endExercise, 1200);
     }
-    proceedToNext();
+
+    document.querySelectorAll('.alt-btn').forEach(b => {
+            b.disabled = true;
+            if (b.innerHTML === q.resposta) b.classList.add('correct');
+        });
+
+    if (q.tipo === 'a') {
+        // Desenha a partitura completa com cantus e contraponto para conferência visual
+        drawScore(q.cantus, q.contraponto, q.cantusPosition, q.cantusClef);
+    }
+
+    updateNextButtonText();
 }
 
 function proceedToNext() {
-    if (currentQuestionIndex + 1 < questions.length) { currentQuestionIndex++; currentQuestionResponse = null; renderCurrentQuestion(); }
-    else endExercise();
+    if (currentQuestionIndex + 1 < questions.length) { 
+        currentQuestionIndex++; 
+        currentQuestionResponse = null; 
+        renderCurrentQuestion(); 
+    } else {
+        endExercise();
+    }
 }
 
 // ==================== RELATÓRIO ====================
@@ -988,19 +1113,56 @@ function saveHistory() { localStorage.setItem('contraponto_history_v9', JSON.str
 function endExercise() {
     endTime = performance.now();
     const tempoMs = endTime - startTimePerf;
+    
     let acertos = 0;
-    const acertosPorTipo = { a:0, b:0, c:0 }, totalPorTipo = { a:0, b:0, c:0 }, acertosPorTrat = {}, totalPorTrat = {};
+    let somaPontuacoes = 0;
+    const acertosPorTipo = { a:0, b:0, c:0 };
+    const totalPorTipo = { a:0, b:0, c:0 };
+    const acertosPorTrat = {};
+    const totalPorTrat = {};
+    
     questions.forEach((q, idx) => {
         totalPorTipo[q.tipo]++;
         totalPorTrat[q.tratamento] = (totalPorTrat[q.tratamento] || 0) + 1;
-        const acertou = userAnswers[idx] === q.resposta;
-        if (acertou) { acertos++; acertosPorTipo[q.tipo]++; acertosPorTrat[q.tratamento] = (acertosPorTrat[q.tratamento] || 0) + 1; }
+        
+        const pontuacao = questionScores[idx] || 0;
+        somaPontuacoes += pontuacao;
+        
+        if (pontuacao > 0) {
+            acertos++;
+            acertosPorTipo[q.tipo]++;
+            acertosPorTrat[q.tratamento] = (acertosPorTrat[q.tratamento] || 0) + 1;
+        }
     });
-    const nota = (acertos / questions.length * 10).toFixed(1);
+    
+    const notaFinal = somaPontuacoes.toFixed(2);
     const nomeAluno = document.getElementById('student-name')?.value || 'Anônimo';
-    const reg = { id: ++attemptId, nome: nomeAluno, especie: currentSpecies + 'ª', tom: currentTonalityName, dataHoraInicio: startTimeDate.toLocaleString(), dataHoraFim: new Date().toLocaleString(), tempoMs, notaFinal: nota, acertos, total: questions.length, acertosPorTipo, totalPorTipo, acertosPorTrat, totalPorTrat };
-    attemptsHistory.push(reg); saveHistory(); generateReport(reg);
-    const rb = document.getElementById('generate-report-btn'); if (rb) rb.disabled = false;
+    const reg = { 
+        id: ++attemptId, 
+        nome: nomeAluno, 
+        especie: currentSpecies + 'ª', 
+        tom: currentTonalityName, 
+        dataHoraInicio: startTimeDate.toLocaleString(), 
+        dataHoraFim: new Date().toLocaleString(), 
+        tempoMs, 
+        notaFinal,
+        somaPontuacoes,
+        acertos,
+        total: questions.length,
+        acertosPorTipo, 
+        totalPorTipo, 
+        acertosPorTrat, 
+        totalPorTrat,
+        questionAttempts: [...questionAttempts],
+        questionScores: [...questionScores]
+    };
+    
+    attemptsHistory.push(reg); 
+    saveHistory(); 
+    generateReport(reg);
+    
+    const rb = document.getElementById('generate-report-btn'); 
+    if (rb) rb.disabled = false;
 }
 
 function msParaHHMMSS(ms) { const totalSeg = Math.floor(ms / 1000); return `${String(Math.floor(totalSeg / 3600)).padStart(2,'0')}:${String(Math.floor((totalSeg % 3600) / 60)).padStart(2,'0')}:${String(totalSeg % 60).padStart(2,'0')}`; }
@@ -1008,16 +1170,56 @@ function msParaHHMMSS(ms) { const totalSeg = Math.floor(ms / 1000); return `${St
 function generateReport(last) {
     if (!last) last = attemptsHistory[attemptsHistory.length-1];
     if (!last) return;
+    
     const tempoFormatado = msParaHHMMSS(last.tempoMs);
     const todosMs = attemptsHistory.map(a => a.tempoMs);
     const mediaMs = todosMs.reduce((a,b) => a+b,0) / todosMs.length;
     const sorted = [...todosMs].sort((a,b)=>a-b);
     const medianaMs = sorted[Math.floor(sorted.length/2)];
     const tipoLabel = { a:'🔊 Auditiva (A)', b:'👁️ Análise (B)', c:'✏️ Escrita (C)' };
+    
     const rc = document.getElementById('report-content');
     if (!rc) return;
-    rc.innerHTML = `<div class="stats-grid"><div class="stat-card"><h4>📋 Dados da Tentativa</h4><p><strong>Aluno:</strong> ${last.nome}</p><p><strong>Espécie:</strong> ${last.especie}</p><p><strong>Tom:</strong> ${last.tom}</p><p><strong>Nota Final:</strong> ${last.notaFinal}/10</p><p><strong>Acertos:</strong> ${last.acertos}/${last.total}</p><p><strong>Tempo:</strong> ${tempoFormatado}</p><p><strong>Início:</strong> ${last.dataHoraInicio}</p><p><strong>Fim:</strong> ${last.dataHoraFim}</p></div><div class="stat-card"><h4>⏱️ Estatísticas de Tempo</h4><p><strong>Tentativas:</strong> ${attemptsHistory.length}</p><p><strong>Média:</strong> ${msParaHHMMSS(mediaMs)}</p><p><strong>Mediana:</strong> ${msParaHHMMSS(medianaMs)}</p></div><div class="stat-card"><h4>🎯 Acertos por Tipo</h4>${['a','b','c'].map(t => `<p>${tipoLabel[t]}: ${last.acertosPorTipo[t] || 0}/${last.totalPorTipo[t] || 4}</p>`).join('')}</div><div class="stat-card"><h4>🎼 Acertos por Tratamento</h4>${Object.keys(last.totalPorTrat || {}).map(k => `<p>${k}: ${last.acertosPorTrat[k] || 0}/${last.totalPorTrat[k] || '?'}</p>`).join('') || '<p>Nenhum acerto registrado</p>'}</div></div>`;
-    const ra = document.getElementById('report-area'); if (ra) ra.classList.add('show');
+    
+    rc.innerHTML = `
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4>📋 Dados da Tentativa</h4>
+                <p><strong>Aluno:</strong> ${last.nome}</p>
+                <p><strong>Espécie:</strong> ${last.especie}</p>
+                <p><strong>Tom:</strong> ${last.tom}</p>
+                <p><strong>Nota Final:</strong> ${last.notaFinal} / ${last.total}</p>
+                <p><strong>Acertos:</strong> ${last.acertos}/${last.total}</p>
+                <p><strong>Taxa de acerto:</strong> ${((last.acertos/last.total)*100).toFixed(1)}%</p>
+                <p><strong>Tempo:</strong> ${tempoFormatado}</p>
+                <p><strong>Início:</strong> ${last.dataHoraInicio}</p>
+                <p><strong>Fim:</strong> ${last.dataHoraFim}</p>
+            </div>
+            <div class="stat-card">
+                <h4>⏱️ Estatísticas de Tempo</h4>
+                <p><strong>Tentativas totais:</strong> ${attemptsHistory.length}</p>
+                <p><strong>Média:</strong> ${msParaHHMMSS(mediaMs)}</p>
+                <p><strong>Mediana:</strong> ${msParaHHMMSS(medianaMs)}</p>
+            </div>
+            <div class="stat-card">
+                <h4>🎯 Acertos por Tipo</h4>
+                <p>${tipoLabel.a}: ${last.acertosPorTipo.a || 0}/${last.totalPorTipo.a || 4}</p>
+                <p>${tipoLabel.b}: ${last.acertosPorTipo.b || 0}/${last.totalPorTipo.b || 4}</p>
+                <p>${tipoLabel.c}: ${last.acertosPorTipo.c || 0}/${last.totalPorTipo.c || 4}</p>
+            </div>
+            <div class="stat-card">
+                <h4>🎼 Detalhamento por Questão</h4>
+                ${last.questionAttempts.map((tent, idx) => `
+                    <p><strong>Q${idx+1}</strong> (${questions[idx]?.tipo?.toUpperCase() || '?'}): 
+                    ${last.questionScores[idx] > 0 ? '✅' : '❌'} 
+                    ${tent} tentativa(s) → pontuação ${last.questionScores[idx].toFixed(2)}</p>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    
+    const ra = document.getElementById('report-area'); 
+    if (ra) ra.classList.add('show');
 }
 
 async function exportPDF() {
@@ -1037,26 +1239,35 @@ async function exportPDF() {
 function startExercise() {
     const nomeInput = document.getElementById('student-name');
     if (!nomeInput?.value.trim()) { alert('Por favor, digite seu nome!'); return; }
+    
     currentSpecies = parseInt(document.getElementById('species-select')?.value || '2');
     generateRandomTonality();
     questions = generateQuestions();
-    if (questions.length === 0) { alert('Erro: Nenhuma questão foi gerada. Tente novamente ou mude a espécie.'); return; }
+    
+    if (questions.length === 0) { 
+        alert('Erro: Nenhuma questão foi gerada. Tente novamente ou mude a espécie.'); 
+        return; 
+    }
+    
     currentQuestionIndex = 0;
     userAnswers = new Array(questions.length).fill(null);
+    questionAttempts = new Array(questions.length).fill(0);
+    questionScores = new Array(questions.length).fill(0);
     currentQuestionResponse = null;
     userContraponto = [];
-    questionAnswered = false;
-    updateNotesList();
+    
     startTimePerf = performance.now();
     startTimeDate = new Date();
     
-    // Atualiza o teclado para refletir a nova tonalidade
     refreshPianoHighlight();
-    
     renderCurrentQuestion();
-    const sb = document.getElementById('start-btn'); if (sb) sb.disabled = true;
-    const rb = document.getElementById('generate-report-btn'); if (rb) rb.disabled = true;
-    const ra = document.getElementById('report-area'); if (ra) ra.classList.remove('show');
+    
+    const sb = document.getElementById('start-btn'); 
+    if (sb) sb.disabled = true;
+    const rb = document.getElementById('generate-report-btn'); 
+    if (rb) rb.disabled = true;
+    const ra = document.getElementById('report-area'); 
+    if (ra) ra.classList.remove('show');
 }
 
 document.addEventListener('keydown', e => { const map = { '1':'w', '2':'h', '4':'q', '8':'8' }; if (map[e.key]) { selectedDuration = map[e.key]; document.querySelectorAll('.duration-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-duration') === selectedDuration)); e.preventDefault(); } });
@@ -1064,14 +1275,13 @@ document.querySelectorAll('.duration-btn').forEach(btn => { btn.onclick = () => 
 const defBtn = document.querySelector('[data-duration="h"]'); if (defBtn) defBtn.classList.add('active');
 document.querySelectorAll('button').forEach(btn => btn.addEventListener('click', activateAudio));
 const sb = document.getElementById('start-btn'); if (sb) sb.onclick = startExercise;
-const nb = document.getElementById('next-btn'); if (nb) nb.onclick = nextQuestion;
 const rb = document.getElementById('reset-btn'); if (rb) rb.onclick = () => location.reload();
 const rpt = document.getElementById('generate-report-btn'); if (rpt) rpt.onclick = exportPDF;
 const clr = document.getElementById('clear-all-notes'); if (clr) clr.onclick = clearAllNotes;
 loadHistory();
 initPiano();
-setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio profissional");
-console.log('✅ Sistema de Contraponto carregado - v26.04.14');
+setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
+console.log('✅ Sistema de Contraponto carregado - v26.04.15');
 </script>
 </body>
 </html>
