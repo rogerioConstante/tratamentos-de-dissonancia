@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v26.04.16</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v26.04.17</title>
 
     <!-- BIBLIOTECAS -->
     <script src="./libs/vexflow.js"></script>
@@ -91,7 +91,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Contraponto & Dissonâncias</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.16</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.17</div>
     </div>
 
     <div class="config-panel">
@@ -679,36 +679,78 @@ function validarRespostaEscrita(q) {
 }
 
 // ==================== GERAÇÃO DE QUESTÕES ====================
-function generateQuestions() {
+function generateQuestions(qtd = 4) {
     const tratamentos = [...tratamentosPorEspecie[currentSpecies]];
     const tratamentosParaGerar = [...tratamentosGeraveis[currentSpecies]];
     const tipoA = [], tipoB = [], tipoC = [];
     const assinaturasUsadas = new Set();
 
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < qtd; i++) {
         const tratamento = tratamentosParaGerar[i % tratamentosParaGerar.length];
-        const isUpperVoice = Math.random() > 0.5;
-        const cantusPosition = isUpperVoice ? 'superior' : 'inferior';
-        const cantusClef = isUpperVoice ? 'treble' : 'bass';
-        let par = null;
+
+        // Tipo A — par independente
+        let parA = null;
         for (let t = 0; t < 40; t++) {
+            const isUpperVoice = Math.random() > 0.5;
             const tentativa = gerarParValido(tratamento, isUpperVoice, 20);
             if (!tentativa.success) continue;
             const { cantus, contraponto } = tentativa;
             const sig = cantus.map(n => n.note).join('|') + '||' + contraponto.map(n => n.note).join('|');
             if (assinaturasUsadas.has(sig)) continue;
             assinaturasUsadas.add(sig);
-            par = tentativa;
+            parA = { ...tentativa, isUpperVoice };
             break;
         }
-        if (!par) { console.warn(`⚠️ Pulando questão para tratamento "${tratamento}"`); continue; }
-        const { cantus, contraponto } = par;
-        tipoA.push({ id: `a${i}`, tipo: 'a', enunciado: 'Identifique <strong>auditivamente</strong> o tratamento de dissonância utilizado:', tratamento, resposta: tratamento, cantus, contraponto, cantusPosition, cantusClef });
-        tipoB.push({ id: `b${i}`, tipo: 'b', enunciado: 'Analise a <strong>partitura</strong> e classifique o tratamento de dissonância:', tratamento, resposta: tratamento, partitura: { cantus, contraponto, cantusPosition, cantusClef } });
+        if (!parA) { console.warn(`⚠️ Pulando questão tipo A para tratamento "${tratamento}"`); }
+        else {
+            tipoA.push({
+                id: `a${i}`,
+                tipo: 'a',
+                enunciado: 'Identifique <strong>auditivamente</strong> o tratamento de dissonância utilizado:',
+                tratamento,
+                resposta: tratamento,
+                cantus: parA.cantus,
+                contraponto: parA.contraponto,
+                cantusPosition: parA.isUpperVoice ? 'superior' : 'inferior',
+                cantusClef: bestClef(parA.cantus),
+                contraClef: bestClef(parA.contraponto)
+            });
+        }
+
+        // Tipo B — par independente
+        let parB = null;
+        for (let t = 0; t < 40; t++) {
+            const isUpperVoice = Math.random() > 0.5;
+            const tentativa = gerarParValido(tratamento, isUpperVoice, 20);
+            if (!tentativa.success) continue;
+            const { cantus, contraponto } = tentativa;
+            const sig = cantus.map(n => n.note).join('|') + '||' + contraponto.map(n => n.note).join('|');
+            if (assinaturasUsadas.has(sig)) continue;
+            assinaturasUsadas.add(sig);
+            parB = { ...tentativa, isUpperVoice };
+            break;
+        }
+        if (!parB) { console.warn(`⚠️ Pulando questão tipo B para tratamento "${tratamento}"`); }
+        else {
+            tipoB.push({
+                id: `b${i}`,
+                tipo: 'b',
+                enunciado: 'Analise a <strong>partitura</strong> e classifique o tratamento de dissonância:',
+                tratamento,
+                resposta: tratamento,
+                partitura: {
+                    cantus: parB.cantus,
+                    contraponto: parB.contraponto,
+                    cantusPosition: parB.isUpperVoice ? 'superior' : 'inferior',
+                    cantusClef: bestClef(parB.cantus),
+                    contraClef: bestClef(parB.contraponto)
+                }
+            });
+        }
     }
 
     const tratamentosC = tratamentos.filter(t => t !== 'D - Sem Dissonâncias');
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < qtd; i++) {
         const tratamentoC = tratamentosC[i % tratamentosC.length];
         let parValido = null;
         for (let t = 0; t < 40; t++) {
@@ -732,7 +774,7 @@ function generateQuestions() {
 }
 
 // ==================== DESENHO DA PARTITURA ====================
-function drawBlankScore(cantusPosition, cantusClef) {
+function drawBlankScore(cantusPosition, cantusClef, contraClef = null) {
     const canvas = document.getElementById('notation-canvas');
     if (!canvas) return;
     try {
@@ -748,7 +790,7 @@ function drawBlankScore(cantusPosition, cantusClef) {
         const keySig = getKeySignatureString(currentTonalityName);
         const yCantus = cantusPosition === 'superior' ? 30 : 155;
         const yContra = cantusPosition === 'superior' ? 155 : 30;
-        const clefContra = cantusClef === 'treble' ? 'bass' : 'treble';
+        const clefContra = contraClef || (cantusClef === 'treble' ? 'bass' : 'treble');
         for (let i = 0; i < numCompassos; i++) {
             const xPos = i === 0 ? MARGEM : MARGEM + LARGURA_CLEF + i * LARGURA_COMPASSO;
             const w = i === 0 ? LARGURA_CLEF + LARGURA_COMPASSO : LARGURA_COMPASSO;
@@ -762,7 +804,7 @@ function drawBlankScore(cantusPosition, cantusClef) {
     } catch(e) { console.error('❌ Erro ao desenhar partitura vazia:', e); }
 }
 
-function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef = 'treble') {
+function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef = 'treble', contraClef = null) {
     const canvas = document.getElementById('notation-canvas');
     if (!canvas) return;
     try {
@@ -788,7 +830,7 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
         const keySig = getKeySignatureString(currentTonalityName);
         const yCantus = cantusPosition === 'superior' ? 30 : 155;
         const yContra = cantusPosition === 'superior' ? 155 : 30;
-        const clefContra = cantusClef === 'treble' ? 'bass' : 'treble';
+        const clefContra = contraClef || (cantusClef === 'treble' ? 'bass' : 'treble');
         const stavesC = [], stavesCP = [];
         for (let i = 0; i < numCompassos; i++) {
             const xPos = i === 0 ? MARGEM : MARGEM + LARGURA_CLEF + i * LARGURA_COMPASSO;
@@ -839,6 +881,40 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             desenharVoz(snotesCP, stavesCP[i], temposCP);
         }
     } catch(e) { console.error('❌ Erro ao desenhar partitura:', e); }
+}
+
+function bestClef(notes) {
+    const trebleStaffBottom = 67; // B/3
+    const trebleStaffTop = 77;    // F/5
+    const bassStaffBottom = 50;   // D/2
+    const bassStaffTop = 59;      // B/3
+
+    function countLedgerLines(noteMidi, clef) {
+        if (clef === 'treble') {
+            if (noteMidi >= trebleStaffBottom && noteMidi <= trebleStaffTop) return 0;
+            if (noteMidi < trebleStaffBottom) {
+                return Math.ceil((trebleStaffBottom - noteMidi) / 2);
+            } else {
+                return Math.ceil((noteMidi - trebleStaffTop) / 2);
+            }
+        } else {
+            if (noteMidi >= bassStaffBottom && noteMidi <= bassStaffTop) return 0;
+            if (noteMidi < bassStaffBottom) {
+                return Math.ceil((bassStaffBottom - noteMidi) / 2);
+            } else {
+                return Math.ceil((noteMidi - bassStaffTop) / 2);
+            }
+        }
+    }
+
+    let trebleTotal = 0, bassTotal = 0;
+    notes.forEach(note => {
+        const midi = noteToNumber(note.note);
+        trebleTotal += countLedgerLines(midi, 'treble');
+        bassTotal += countLedgerLines(midi, 'bass');
+    });
+
+    return trebleTotal <= bassTotal ? 'treble' : 'bass';
 }
 
 // ==================== PIANO VIRTUAL ====================
@@ -1014,12 +1090,19 @@ function renderCurrentQuestion() {
     const pi = document.getElementById('progress-info'); 
     if (pi) pi.innerHTML = `Questão <strong>${currentQuestionIndex+1}</strong> de <strong>${questions.length}</strong> | Tipo: <strong>${q.tipo==='a'?'Auditiva':q.tipo==='b'?'Análise':'Escrita'}</strong> | Espécie: <strong>${currentSpecies}ª</strong> | Tom: <strong>${currentTonalityName}</strong>`;
     
-    if (q.tipo === 'a') drawBlankScore(q.cantusPosition, q.cantusClef);
-    else if (q.tipo === 'b') drawScore(q.partitura.cantus, q.partitura.contraponto, q.partitura.cantusPosition, q.partitura.cantusClef);
+    if (q.tipo === 'a') drawBlankScore(q.cantusPosition, q.cantusClef, q.contraClef);
+    else if (q.tipo === 'b') {
+        drawScore(q.partitura.cantus, q.partitura.contraponto, q.partitura.cantusPosition, q.partitura.cantusClef, q.partitura.contraClef);
+        activateAudio().then(() => {
+            setTimeout(() => {
+        playScore(q.partitura.cantus, q.partitura.contraponto);
+        }, 300);
+    });
+        }
     else if (q.tipo === 'c') { 
         if (!alreadyAnswered) userContraponto = []; 
         updateNotesList(); 
-        drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef); 
+        drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
     }
     
     const pianoDiv = document.getElementById('virtual-piano'); 
@@ -1109,7 +1192,7 @@ function checkAnswer(choice, btn, q) {
 
     if (q.tipo === 'a') {
         // Desenha a partitura completa com cantus e contraponto para conferência visual
-        drawScore(q.cantus, q.contraponto, q.cantusPosition, q.cantusClef);
+        drawScore(q.cantus, q.contraponto, q.cantusPosition, q.cantusClef, q.contraClef);
     }
 
     updateNextButtonText();
@@ -1154,7 +1237,7 @@ function endExercise() {
         }
     });
     
-    const notaFinal = somaPontuacoes.toFixed(2);
+    const notaFinal = ((somaPontuacoes / questions.length ) * 10).toFixed(2);
     const nomeAluno = document.getElementById('student-name')?.value || 'Anônimo';
     const reg = { 
         id: ++attemptId, 
@@ -1173,7 +1256,8 @@ function endExercise() {
         acertosPorTrat, 
         totalPorTrat,
         questionAttempts: [...questionAttempts],
-        questionScores: [...questionScores]
+        questionScores: [...questionScores],
+        qtd: questions.length/3
     };
     
     attemptsHistory.push(reg); 
@@ -1222,9 +1306,9 @@ function generateReport(last) {
             </div>
             <div class="stat-card">
                 <h4>🎯 Acertos por Tipo</h4>
-                <p>${tipoLabel.a}: ${last.acertosPorTipo.a || 0}/${last.totalPorTipo.a || 4}</p>
-                <p>${tipoLabel.b}: ${last.acertosPorTipo.b || 0}/${last.totalPorTipo.b || 4}</p>
-                <p>${tipoLabel.c}: ${last.acertosPorTipo.c || 0}/${last.totalPorTipo.c || 4}</p>
+                <p>${tipoLabel.a}: ${last.acertosPorTipo.a || 0}/${last.totalPorTipo.a || last.qtd}</p>
+                <p>${tipoLabel.b}: ${last.acertosPorTipo.b || 0}/${last.totalPorTipo.b || last.qtd}</p>
+                <p>${tipoLabel.c}: ${last.acertosPorTipo.c || 0}/${last.totalPorTipo.c || last.qtd}</p>
             </div>
             <div class="stat-card">
                 <h4>🎼 Detalhamento por Questão</h4>
@@ -1261,7 +1345,7 @@ function startExercise() {
     
     currentSpecies = parseInt(document.getElementById('species-select')?.value || '2');
     generateRandomTonality();
-    questions = generateQuestions();
+    questions = generateQuestions(5);
     
     if (questions.length === 0) { 
         alert('Erro: Nenhuma questão foi gerada. Tente novamente ou mude a espécie.'); 
@@ -1300,7 +1384,7 @@ const clr = document.getElementById('clear-all-notes'); if (clr) clr.onclick = c
 loadHistory();
 initPiano();
 setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
-console.log('✅ Sistema de Contraponto carregado - v26.04.16');
+console.log('✅ Sistema de Contraponto carregado - v26.04.17');
 </script>
 </body>
 </html>
