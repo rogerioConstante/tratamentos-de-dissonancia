@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v27.04.28</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v29.04.19</title>
 
     <!-- BIBLIOTECAS -->
     <script src="./libs/vexflow.js"></script>
@@ -91,7 +91,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Contraponto & Dissonâncias</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v27.04.28</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v29.04.19</div>
     </div>
 
     <div class="config-panel">
@@ -118,7 +118,7 @@
                 <option value="fm">🎹 Piano (FM)</option>
                 <option value="am">🎻 Cordas (AM)</option>
                 <option value="synth">🎚️ Synth</option>
-                <option value="sampler">🎹 Piano Real</option>
+                <option value="sampler" selected>🎹 Piano Real</option>
             </select>
             <span id="audio-status">🎧 Clique em qualquer botão para ativar o áudio</span>
         </div>
@@ -166,7 +166,7 @@
 <div id="modal" class="modal"><div class="modal-content"><p id="modal-message">Confirmar ação?</p><div class="modal-buttons"><button id="modal-confirm">Confirmar</button><button id="modal-cancel">Cancelar</button></div></div></div>
 
 <script>
-// ==================== TONE.JS (ÁUDIO PROFISSIONAL) ====================
+// ==================== TONE.JS ====================
 let toneReady = false;
 let synthCantus = null;
 let synthCP = null;
@@ -260,7 +260,7 @@ async function playNotePreview(midiNote, duration = 0.5) {
         if (!toneReady) await initToneAdvanced();
         const now = Tone.now();
         const noteName = Tone.Frequency(midiNote, "midi").toNote();
-        const instrumentType = document.getElementById('instrument-select')?.value || 'fm';
+        const instrumentType = document.getElementById('instrument-select')?.value || 'sampler';
         if (instrumentType === 'sampler') {
             if (samplerPiano && samplerPiano.loaded) {
                 samplerPiano.triggerAttackRelease(noteName, duration, now, 0.7);
@@ -306,7 +306,7 @@ function numberToNote(num) {
     return currentNoteNames[num % 12] + '/' + octave;
 }
 
-function vexToMidi(vexNote) { return noteToNumber(vexNote) - 12; }
+function vexToMidi(vexNote) { return noteToNumber(vexNote) }
 
 // ==================== DIREÇÃO DAS HASTES ====================
 function getStemDirection(vexNote, clef) {
@@ -335,7 +335,7 @@ async function playScoreTone(cantus, contraponto) {
             (cantus || []).forEach(n => {
                 const dur = durMap[n.duration] || 1;
                 const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
-                samplerPiano.triggerAttackRelease(noteName, dur * 0.95, humanizeTime(now + tC), humanizeVelocity());
+                samplerPiano.triggerAttackRelease(noteName, dur * 1.05, humanizeTime(now + tC), humanizeVelocity());
                 tC += dur;
             });
             let tCP = 0;
@@ -343,7 +343,7 @@ async function playScoreTone(cantus, contraponto) {
                 const dur = durMap[n.duration] || 1;
                 if (n.note !== null && n.duration !== 'hr') {
                     const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
-                    samplerPiano.triggerAttackRelease(noteName, dur * 0.9, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
+                    samplerPiano.triggerAttackRelease(noteName, dur * 1.05, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
                 }
                 tCP += dur;
             });
@@ -619,63 +619,79 @@ function isStep(a, b) {
     const diff = Math.abs(noteToNumber(b) - noteToNumber(a));
     return diff === 1 || diff === 2;
 }
-
-// scaleStepFromNote: retorna a nota N graus acima/abaixo na escala, ou null se sair do range
-function scaleStepSafe(vexNote, steps, rangeMin, rangeMax) {
-    const result = scaleStep(vexNote, steps);
-    if (!result) return null;
-    const num = noteToNumber(result);
-    if (num < rangeMin || num > rangeMax) return null;
-    return result;
+function isThird(a, b) {
+    const diff = Math.abs(noteToNumber(b) - noteToNumber(a));
+    return diff === 3 || diff === 4;
 }
-
-// Verifica se uma nota é consonante com outra (passada como vexNote)
+function isLeapPermitido(a, b, next) {
+    const semi = Math.abs(noteToNumber(b) - noteToNumber(a));
+    if (semi < 7) return true;                          // ≤ 4ª: sempre OK
+    if (semi === 7) return false;                        // 5ª dim: proibido
+    if (semi === 8 || semi === 9 || semi === 12) {       // 6ª ou 8ª
+        if (!next) return false;                         // sem compensação: proibido
+        const comp = noteToNumber(next) - noteToNumber(b);
+        const dirSalto = Math.sign(noteToNumber(b) - noteToNumber(a));
+        return Math.sign(comp) === -dirSalto             // direção contrária
+            && Math.abs(comp) < 7;                       // < 5ª
+    }
+    return false;                                        // 7ª, 9ª+: proibido
+}
 function consComCantus(cpNote, cantusNote) {
     return isConsonant(noteToNumber(cpNote) - noteToNumber(cantusNote));
 }
-
-// Verifica paralelismo entre dois pares consecutivos de notas
 function hasParalelasCP(cpA, cpB, cantusA, cantusB) {
     return hasParalelas(cpA, cpB, cantusA, cantusB);
 }
-
-// Verifica cruzamento para um par cp/cantus
 function hasCruz(cpNote, cantusNote, cpAbaixo) {
     return hasCruzamento(cpNote, cantusNote, cpAbaixo);
 }
+function hasOcultas(cpA, cpB, cantusA, cantusB, cpAbaixo) {
+    // Intervalo de chegada deve ser 5ª ou 8ª perfeita
+    const intChegada = Math.abs(noteToNumber(cpB) - noteToNumber(cantusB));
+    if (intChegada%12 !== 0 && intChegada%12 !== 7) return false;
 
-// Gera um contraponto de 3ª espécie para um dado tratamento
-// Retorna array de notas com durations, ou null se falhar
+    // Intervalos diferentes
+    const intSaida = Math.abs(noteToNumber(cpA) - noteToNumber(cantusA));
+    if (intChegada === intSaida) return false; // movimento paralelo: verificado em função hasParalelasCP
+
+    // Movimento direto: ambas as vozes na mesma direção
+    const dirCP     = Math.sign(noteToNumber(cpB) - noteToNumber(cpA));
+    const dirCantus = Math.sign(noteToNumber(cantusB) - noteToNumber(cantusA));
+    if (dirCP === 0 || dirCantus === 0) return false;   // movimento oblíquo: OK
+    if (dirCP !== dirCantus) return false;              // movimento contrário: OK
+
+    // Voz superior move por salto (não por grau)
+    const vozSuperior = cpAbaixo ? cantusB : cpB;
+    const vozSuperiorAntes = cpAbaixo ? cantusA : cpA;
+    return !isStep(vozSuperiorAntes, vozSuperior);
+}
 function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     if (!cantus || cantus.length < 2) return null;
-    const cf1 = cantus[0].note; // cantus compasso 1
-    const cf2 = cantus[1].note; // cantus compasso 2
+    const cf1 = cantus[0].note;
+    const cf2 = cantus[1].note;
     const s1 = noteToNumber(cf1);
     const s2 = noteToNumber(cf2);
-    const cpAbaixo = isUpperVoice; // true = cp está abaixo do cantus
+    const cpAbaixo = isUpperVoice;
 
-    // Range do contraponto baseado na posição
     const rangeMin = cpAbaixo ? s1 - 22 : s1 + 1;
     const rangeMax = cpAbaixo ? s1 - 1 : s1 + 22;
 
-    // Candidatos consonantes com cf1 dentro do range
+    // Candidates consonant with cf1
     const candidatosCons1 = [];
     for (let num = rangeMin; num <= rangeMax; num++) {
         const vex = numberToNote(num);
-        const noteName = vex.split('/')[0];
-        if (!currentScale.includes(noteName)) continue;
+        if (!currentScale.includes(vex.split('/')[0])) continue;
         if (isConsonant(num - s1)) candidatosCons1.push(vex);
     }
     if (candidatosCons1.length === 0) return null;
 
-    // Candidatos consonantes com cf2
+    // Candidates consonant with cf2
+    const r2Min = cpAbaixo ? s2 - 22 : s2 + 1;
+    const r2Max = cpAbaixo ? s2 - 1 : s2 + 22;
     const candidatosCons2 = [];
-    const range2Min = cpAbaixo ? s2 - 22 : s2 + 1;
-    const range2Max = cpAbaixo ? s2 - 1 : s2 + 22;
-    for (let num = range2Min; num <= range2Max; num++) {
+    for (let num = r2Min; num <= r2Max; num++) {
         const vex = numberToNote(num);
-        const noteName = vex.split('/')[0];
-        if (!currentScale.includes(noteName)) continue;
+        if (!currentScale.includes(vex.split('/')[0])) continue;
         if (isConsonant(num - s2)) candidatosCons2.push(vex);
     }
     if (candidatosCons2.length === 0) return null;
@@ -683,163 +699,171 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     const shuffled1 = embaralhar([...candidatosCons1]);
     const shuffled2 = embaralhar([...candidatosCons2]);
 
-    // ── Validação geral de uma sequência de 5 notas ──
-    // pos: [n1,n2,n3,n4,n5]  cantusNotas: [cf1,cf1,cf1,cf1,cf2]
-    function validarSequencia(notas) {
+    function inScale(vex) {
+        if (!vex) return false;
+        return currentScale.includes(vex.split('/')[0]);
+    }
+    function inRangeScale(vex) {
+        if (!vex) return false;
+        const num = noteToNumber(vex);
+        return inScale(vex) && num >= rangeMin - 4 && num <= rangeMax + 4;
+    }
+
+    // General sequence validator: checks scale, crossing, parallels, narrow leaps for "extra" notes
+    // extraIdxs: positions that are not part of the treatment nucleus — must be cons + narrow leap
+    function validarSequencia(notas, extraIdxs) {
         const cfNotas = [cf1, cf1, cf1, cf1, cf2];
+        const cpAbaixo = noteToNumber(notas[0]) < noteToNumber(cfNotas[0]);
         for (let i = 0; i < notas.length; i++) {
             if (!notas[i]) return false;
-            const noteName = notas[i].split('/')[0];
-            if (!currentScale.includes(noteName)) return false;
+            if (!inScale(notas[i])) return false;
             if (hasCruz(notas[i], cfNotas[i], cpAbaixo)) return false;
         }
-        // Sem paralelas entre posições consecutivas (exceto internas que não tocam barras)
-        // Verificar especialmente: pos4→pos5 (cruzam a barra de compasso)
-        const idx = [[0,1],[1,2],[2,3],[3,4]];
-        for (const [a,b] of idx) {
-            if (hasParalelasCP(notas[a], notas[b], cfNotas[a], cfNotas[b])) return false;
+        // Paralelas ou ocultas
+        for (let i = 0; i < notas.length - 1; i++) {
+            if (hasParalelasCP(notas[i], notas[i+1], cfNotas[i], cfNotas[i+1])) return false;
+            if (hasOcultas(notas[i], notas[i+1], cfNotas[i], cfNotas[i+1], cpAbaixo)) return false;
+        }
+        // Extra notes: must be consonant and move by less than a 5th to adjacent notes
+        if (extraIdxs) {
+            for (const idx of extraIdxs) {
+                if (!consComCantus(notas[idx], cfNotas[idx])) return false;
+                // Salto de chegada à nota extra
+                if (idx > 0 && notas[idx-1])
+                    if (!isLeapPermitido(notas[idx-1], notas[idx], notas[idx+1] ?? null)) return false;
+                // Salto de saída da nota extra
+                if (idx < notas.length - 1 && notas[idx+1])
+                    if (!isLeapPermitido(notas[idx], notas[idx+1], notas[idx+2] ?? null)) return false;
+            }
         }
         return true;
     }
 
-    // Helper: verifica se nota está na escala e no range
-    function inRangeScale(vex) {
-        if (!vex) return false;
-        const num = noteToNumber(vex);
-        const noteName = vex.split('/')[0];
-        return currentScale.includes(noteName) && num >= rangeMin - 3 && num <= rangeMax + 3;
+    function seqStd(arr) {
+        return [
+            { note: arr[0], duration: 'q' },
+            { note: arr[1], duration: 'q' },
+            { note: arr[2], duration: 'q' },
+            { note: arr[3], duration: 'q' },
+            { note: arr[4], duration: 'w' }
+        ];
     }
 
-    // ── NOTA DE PASSAGEM — possibilidades a, b, c ──
+    // ── NOTA DE PASSAGEM ──
     if (tratamento === 'A - Nota de passagem') {
-        const possibilidades = embaralhar(['a','b','c']);
-        for (const poss of possibilidades) {
+        for (const poss of embaralhar(['a','b','c'])) {
             for (let xi = 0; xi < shuffled1.length; xi++) {
                 if (poss === 'a') {
-                    // n1(cons) → n2(diss) → n3(cons) → n4(cons) | n5(cons)
+                    // cons → diss → cons → cons(extra) | cons(extra)
                     const n1 = shuffled1[xi];
-                    for (const dir of [1,-1]) {
-                        const n2 = scaleStep(n1, dir);
-                        if (!n2 || !inRangeScale(n2)) continue;
-                        if (consComCantus(n2, cf1)) continue; // deve ser diss
-                        const n3 = scaleStep(n2, dir);
-                        if (!n3 || !inRangeScale(n3)) continue;
+                    for (const dir of embaralhar([1,-1])) {
+                        const n2 = scaleStep(n1, dir); if (!n2||!inRangeScale(n2)) continue;
+                        if (consComCantus(n2, cf1)) continue;
+                        const n3 = scaleStep(n2, dir); if (!n3||!inRangeScale(n3)) continue;
                         if (!consComCantus(n3, cf1)) continue;
-                        for (const n4 of shuffled1.filter(n => consComCantus(n, cf1))) {
+                        for (const n4 of shuffled1) {
+                            if (!consComCantus(n4, cf1)) continue;
+                            if (!isLeapPermitido(n3, n4)) continue;
                             for (const n5 of shuffled2) {
-                                const seq = [n1,n2,n3,n4,n5];
-                                if (validarSequencia(seq)) {
-                                    return seqParaNotas3(seq, 'std');
-                                }
+                                if (!isLeapPermitido(n4, n5)) continue;
+                                if (validarSequencia([n1,n2,n3,n4,n5], [3,4])) return seqStd([n1,n2,n3,n4,n5]);
                             }
                         }
                     }
                 } else if (poss === 'b') {
-                    // n1(cons) → n2(cons) → n3(cons/prep) → n4(diss) | n5(cons)
+                    // cons(extra) → cons(extra) → cons(prep) → diss | cons(res)
                     const n3 = shuffled1[xi];
-                    for (const dir of [1,-1]) {
-                        const n4 = scaleStep(n3, dir);
-                        if (!n4 || !inRangeScale(n4)) continue;
-                        if (consComCantus(n4, cf1)) continue; // n4 deve ser diss com cf1
-                        for (const n5 of shuffled2) {
-                            if (!consComCantus(n5, cf2)) continue;
-                            // n5 deve ser continuação do movimento (resolução)
-                            if (!isStep(n4, n5)) continue;
-                            if (Math.sign(noteToNumber(n5) - noteToNumber(n4)) !== dir) continue;
-                            for (const n1 of shuffled1.filter(n => consComCantus(n, cf1))) {
-                                for (const n2 of shuffled1.filter(n => consComCantus(n, cf1))) {
-                                    const seq = [n1,n2,n3,n4,n5];
-                                    if (validarSequencia(seq)) {
-                                        return seqParaNotas3(seq, 'std');
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else { // poss c
-                    // n1(cons) → n2(diss) → n3(cons/prep) → n4(diss) | n5(cons)
-                    const n1 = shuffled1[xi];
-                    for (const dir of [1,-1]) {
-                        const n2 = scaleStep(n1, dir);
-                        if (!n2 || !inRangeScale(n2)) continue;
-                        if (consComCantus(n2, cf1)) continue;
-                        const n3 = scaleStep(n2, dir);
-                        if (!n3 || !inRangeScale(n3)) continue;
-                        if (!consComCantus(n3, cf1)) continue;
-                        const n4 = scaleStep(n3, dir);
-                        if (!n4 || !inRangeScale(n4)) continue;
+                    for (const dir of embaralhar([1,-1])) {
+                        const n4 = scaleStep(n3, dir); if (!n4||!inRangeScale(n4)) continue;
                         if (consComCantus(n4, cf1)) continue;
                         for (const n5 of shuffled2) {
                             if (!consComCantus(n5, cf2)) continue;
                             if (!isStep(n4, n5)) continue;
-                            if (Math.sign(noteToNumber(n5) - noteToNumber(n4)) !== dir) continue;
-                            const seq = [n1,n2,n3,n4,n5];
-                            if (validarSequencia(seq)) {
-                                return seqParaNotas3(seq, 'std');
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    // ── BORDADURA (Superior e Inferior) — possibilidades a, b, c ──
-    if (tratamento === 'B - Bordadura' || tratamento === 'B - Bordadura Inferior' || tratamento === 'C - Bordadura Superior') {
-        // Para 3ª espécie, o tratamento é unificado como "B - Bordadura"
-        // dirs permitidos: superior (+1) ou inferior (-1)
-        const dirs = embaralhar([1,-1]);
-        const possibilidades = embaralhar(['a','b','c']);
-        for (const poss of possibilidades) {
-            for (const dir of dirs) {
-                for (let xi = 0; xi < shuffled1.length; xi++) {
-                    if (poss === 'a') {
-                        // prep(cons) → B(diss) → res(cons) → cons | cons
-                        const prep = shuffled1[xi];
-                        const B = scaleStep(prep, dir);
-                        if (!B || !inRangeScale(B)) continue;
-                        if (consComCantus(B, cf1)) continue; // B deve ser diss
-                        const res = prep; // retorna à mesma nota
-                        for (const n4 of shuffled1.filter(n => consComCantus(n, cf1))) {
-                            for (const n5 of shuffled2) {
-                                const seq = [prep, B, res, n4, n5];
-                                if (validarSequencia(seq)) return seqParaNotas3(seq, 'std');
-                            }
-                        }
-                    } else if (poss === 'b') {
-                        // cons → cons → prep(cons) → B(diss) | res(cons)
-                        const prep = shuffled1[xi];
-                        const B = scaleStep(prep, dir);
-                        if (!B || !inRangeScale(B)) continue;
-                        if (consComCantus(B, cf1)) continue;
-                        for (const n5 of shuffled2) {
-                            if (noteToNumber(n5) !== noteToNumber(prep)) continue; // resolução = prep
-                            if (!consComCantus(n5, cf2)) continue;
-                            for (const n1 of shuffled1.filter(n => consComCantus(n, cf1))) {
-                                for (const n2 of shuffled1.filter(n => consComCantus(n, cf1))) {
-                                    const seq = [n1, n2, prep, B, n5];
-                                    if (validarSequencia(seq)) return seqParaNotas3(seq, 'std');
+                            if (Math.sign(noteToNumber(n5)-noteToNumber(n4)) !== dir) continue;
+                            for (const n1 of shuffled1) {
+                                if (!consComCantus(n1, cf1)) continue;
+                                if (!isLeapPermitido(n1, n3)) continue;
+                                for (const n2 of shuffled1) {
+                                    if (!consComCantus(n2, cf1)) continue;
+                                    if (!isLeapPermitido(n1, n2)||!isLeapPermitido(n2, n3)) continue;
+                                    if (validarSequencia([n1,n2,n3,n4,n5], [0,1])) return seqStd([n1,n2,n3,n4,n5]);
                                 }
                             }
                         }
-                    } else { // poss c — duas bordaduras
-                        // prep(cons) → B(diss) → res/prep(cons) → B(diss) | res(cons)
+                    }
+                } else {
+                    // cons(prep) → diss → cons/diss → diss | cons(res)
+                    const n1 = shuffled1[xi];
+                    for (const dir of embaralhar([1,-1])) {
+                        const n2 = scaleStep(n1, dir); if (!n2||!inRangeScale(n2)) continue;
+                        if (consComCantus(n2, cf1)) continue;
+                        const n3 = scaleStep(n2, dir); if (!n3||!inRangeScale(n3)) continue;
+                        if (!consComCantus(n3, cf1)) continue;
+                        const n4 = scaleStep(n3, dir); if (!n4||!inRangeScale(n4)) continue;
+                        if (consComCantus(n4, cf1)) continue;
+                        for (const n5 of shuffled2) {
+                            if (!consComCantus(n5, cf2)) continue;
+                            if (!isStep(n4, n5)) continue;
+                            const dirN3N4 = Math.sign(noteToNumber(n4) - noteToNumber(n3));
+                            const dirN4N5 = Math.sign(noteToNumber(n5) - noteToNumber(n4));
+                            if (dirN4N5 !== dirN3N4) continue;
+                            if (Math.sign(noteToNumber(n5)-noteToNumber(n4)) !== dir) continue;
+                            if (validarSequencia([n1,n2,n3,n4,n5], [])) return seqStd([n1,n2,n3,n4,n5]);
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    // ── BORDADURA ──
+    if (tratamento === 'B - Bordadura') {
+        for (const poss of embaralhar(['a','b','c'])) {
+            for (const dir of embaralhar([1,-1])) {
+                for (let xi = 0; xi < shuffled1.length; xi++) {
+                    if (poss === 'a') {
                         const prep = shuffled1[xi];
-                        for (const dir2 of [1,-1]) {
-                            const B1 = scaleStep(prep, dir);
-                            if (!B1 || !inRangeScale(B1)) continue;
+                        const B = scaleStep(prep, dir); if (!B||!inRangeScale(B)) continue;
+                        if (consComCantus(B, cf1)) continue;
+                        const res = prep;
+                        for (const n4 of shuffled1) {
+                            if (!consComCantus(n4, cf1)) continue;
+                            if (!isLeapPermitido(res, n4)) continue;
+                            for (const n5 of shuffled2) {
+                                if (!isLeapPermitido(n4, n5)) continue;
+                                if (validarSequencia([prep,B,res,n4,n5], [3,4])) return seqStd([prep,B,res,n4,n5]);
+                            }
+                        }
+                    } else if (poss === 'b') {
+                        const prep = shuffled1[xi];
+                        const B = scaleStep(prep, dir); if (!B||!inRangeScale(B)) continue;
+                        if (consComCantus(B, cf1)) continue;
+                        for (const n5 of shuffled2) {
+                            if (noteToNumber(n5) !== noteToNumber(prep)) continue;
+                            if (!consComCantus(n5, cf2)) continue;
+                            for (const n1 of shuffled1) {
+                                if (!consComCantus(n1, cf1)) continue;
+                                if (!isLeapPermitido(n1, prep)) continue;
+                                for (const n2 of shuffled1) {
+                                    if (!consComCantus(n2, cf1)) continue;
+                                    if (!isLeapPermitido(n1, n2)||!isLeapPermitido(n2, prep)) continue;
+                                    if (validarSequencia([n1,n2,prep,B,n5], [0,1])) return seqStd([n1,n2,prep,B,n5]);
+                                }
+                            }
+                        }
+                    } else {
+                        // duas bordaduras de lados opostos
+                        const prep = shuffled1[xi];
+                        for (const dir2 of [dir === 1 ? -1 : 1]) {
+                            const B1 = scaleStep(prep, dir); if (!B1||!inRangeScale(B1)) continue;
                             if (consComCantus(B1, cf1)) continue;
-                            const prep2 = prep; // retorna
-                            const B2 = scaleStep(prep2, dir2);
-                            if (!B2 || !inRangeScale(B2)) continue;
+                            const B2 = scaleStep(prep, dir2); if (!B2||!inRangeScale(B2)) continue;
                             if (consComCantus(B2, cf1)) continue;
-                            if (dir === dir2) continue; // as duas bordaduras devem ser de lados opostos
                             for (const n5 of shuffled2) {
                                 if (noteToNumber(n5) !== noteToNumber(prep)) continue;
                                 if (!consComCantus(n5, cf2)) continue;
-                                const seq = [prep, B1, prep2, B2, n5];
-                                if (validarSequencia(seq)) return seqParaNotas3(seq, 'std');
+                                if (validarSequencia([prep,B1,prep,B2,n5], [])) return seqStd([prep,B1,prep,B2,n5]);
                             }
                         }
                     }
@@ -849,38 +873,37 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
         return null;
     }
 
-    // ── CAMBIATA — descendente e ascendente ──
+    // ── CAMBIATA (padrão Schoenberg) ──
+    // Descendente: −2ª, −3ª, +2ª, +2ª  |  Ascendente: +2ª, +3ª, −2ª, −2ª
+    // n1 cons; n2,n3,n4 podem ser diss (máx 2 diss entre os três); n5 cons
     if (tratamento === 'C - Cambiata') {
-        // Descendente: n1 → −1gr → −2gr(salto3ª) → +1gr → +1gr | cons
-        // Ascendente:  n1 → +1gr → +2gr(salto3ª) → −1gr → −1gr | cons
-        const direcoes = embaralhar(['desc','asc']);
-        for (const direcao of direcoes) {
+        for (const direcao of embaralhar(['desc','asc'])) {
             for (let xi = 0; xi < shuffled1.length; xi++) {
                 const n1 = shuffled1[xi];
                 let n2, n3, n4;
                 if (direcao === 'desc') {
-                    n2 = scaleStep(n1, -1);
-                    if (!n2 || !inRangeScale(n2)) continue;
-                    n3 = scaleStep(n2, -2); // salto de 3ª descendente
-                    if (!n3 || !inRangeScale(n3)) continue;
-                    n4 = scaleStep(n3, 1);
-                    if (!n4 || !inRangeScale(n4)) continue;
+                    n2 = scaleStep(n1, -1); if (!n2||!inRangeScale(n2)) continue;
+                    n3 = scaleStep(n2, -2); if (!n3||!inRangeScale(n3)) continue; // salto 3ª desc
+                    n4 = scaleStep(n3,  1); if (!n4||!inRangeScale(n4)) continue; // 2ª asc
+                    n5 = scaleStep(n4,  1); if (!n5||!inRangeScale(n5)) continue; // 2ª asc
                 } else {
-                    n2 = scaleStep(n1, 1);
-                    if (!n2 || !inRangeScale(n2)) continue;
-                    n3 = scaleStep(n2, 2); // salto de 3ª ascendente
-                    if (!n3 || !inRangeScale(n3)) continue;
-                    n4 = scaleStep(n3, -1);
-                    if (!n4 || !inRangeScale(n4)) continue;
+                    n2 = scaleStep(n1,  1); if (!n2||!inRangeScale(n2)) continue;
+                    n3 = scaleStep(n2,  2); if (!n3||!inRangeScale(n3)) continue; // salto 3ª asc
+                    n4 = scaleStep(n3, -1); if (!n4||!inRangeScale(n4)) continue; // 2ª desc
+                    n5 = scaleStep(n4, -1); if (!n5||!inRangeScale(n5)) continue; // 2ª desc
                 }
-                // n1 cons, n2 pode ser diss, n3 cons, n4 cons ou diss
-                if (!consComCantus(n1, cf1)) continue;
-                if (consComCantus(n2, cf1)) continue; // n2 DEVE ser diss (característica)
-                if (!consComCantus(n3, cf1)) continue;
-                for (const n5 of shuffled2) {
-                    const seq = [n1, n2, n3, n4, n5];
-                    if (validarSequencia(seq)) return seqParaNotas3(seq, 'std');
-                }
+                // Verificar perfil melódico: n1→n2 step, n2→n3 third, n3→n4 step
+                if (!isStep(n1, n2)) continue;
+                if (!isThird(n2, n3)) continue;
+                if (!isStep(n3, n4)) continue;
+                if (!isStep(n4, n5)) continue;
+                // Máx 2 diss entre n2, n3, n4
+                const dissCount = [n2,n3,n4].filter(n => !consComCantus(n, cf1)).length;
+                if (dissCount > 2) continue;
+                if (!consComCantus(n5, cf2)) continue;
+
+                if (validarSequencia([n1,n2,n3,n4,n5], [])) return seqStd([n1,n2,n3,n4,n5]);
+
             }
         }
         return null;
@@ -888,20 +911,16 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
 
     // ── BORDADURA DUPLA ──
     if (tratamento === 'D - Bordadura dupla') {
-        // prep(cons) → Bsup(diss/cons) → Binf(diss/cons) → prep(cons) | cons
-        // ou prep → Binf → Bsup → prep | cons
         for (let xi = 0; xi < shuffled1.length; xi++) {
             const prep = shuffled1[xi];
-            for (const ordemBordaduras of [[1,-1],[-1,1]]) {
-                const [d1, d2] = ordemBordaduras;
-                const B1 = scaleStep(prep, d1);
-                if (!B1 || !inRangeScale(B1)) continue;
-                const B2 = scaleStep(prep, d2);
-                if (!B2 || !inRangeScale(B2)) continue;
+            for (const [d1, d2] of [[1,-1],[-1,1]]) {
+                const B1 = scaleStep(prep, d1); if (!B1||!inRangeScale(B1)) continue;
+                const B2 = scaleStep(prep, d2); if (!B2||!inRangeScale(B2)) continue;
+                if (!isLeapPermitido(B1, B2)) continue;
                 for (const n5 of shuffled2) {
-                    const seq = [prep, B1, B2, prep, n5];
                     if (!consComCantus(n5, cf2)) continue;
-                    if (validarSequencia(seq)) return seqParaNotas3(seq, 'std');
+                    if (!isLeapPermitido(prep, n5)) continue;
+                    if (validarSequencia([prep,B1,B2,prep,n5], [])) return seqStd([prep,B1,B2,prep,n5]);
                 }
             }
         }
@@ -910,85 +929,81 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
 
     // ── GRUPO DE NOTAS DE PASSAGEM ──
     if (tratamento === 'E - Grupo de notas de passagem') {
-        // cons → pass → pass → cons | cons  (movimento conjunto, mesma direção, cobre 4ª)
-        for (const dir of [1,-1]) {
-            for (let xi = 0; xi < shuffled1.length; xi++) {
-                const n1 = shuffled1[xi];
-                const n2 = scaleStep(n1, dir);
-                if (!n2 || !inRangeScale(n2)) continue;
-                const n3 = scaleStep(n2, dir);
-                if (!n3 || !inRangeScale(n3)) continue;
-                const n4 = scaleStep(n3, dir);
-                if (!n4 || !inRangeScale(n4)) continue;
-                if (!consComCantus(n4, cf1)) continue; // pos4 cons com cf1
-                // n2 ou n3 devem ser dissonantes (ao menos um)
-                if (consComCantus(n2, cf1) && consComCantus(n3, cf1)) continue;
-                for (const n5 of shuffled2) {
-                    const seq = [n1, n2, n3, n4, n5];
-                    if (validarSequencia(seq)) return seqParaNotas3(seq, 'std');
+        for (let xi = 0; xi < shuffled1.length; xi++) {
+            const dir = Math.random() > 0.5 ? 1 : -1;
+            let n1 = shuffled1[xi]; // Consonant (already picked)
+            let n2 = scaleStep(n1, dir);
+            let n3 = scaleStep(n2, dir);
+            let n4 = scaleStep(n3, dir);
+            let n5 = scaleStep(n4, dir);
+
+            // Validation logic:
+            if (consComCantus(n1, cf1) && !consComCantus(n2, cf1) &&
+                !consComCantus(n3, cf1) && consComCantus(n4, cf1)) { // Pattern n1 to n4 is C-D-D-C
+                for (n5 of shuffled2) {
+                    if (!consComCantus(n5, cf2)) continue;
+                    if (!isLeapPermitido(n4, n5)) continue;
+                    if (validarSequencia([n1,n2,n3,n4,n5], [])) return seqStd([n1,n2,n3,n4,n5]);
+                }
+            } else if (consComCantus(n2, cf1) && !consComCantus(n3, cf1) &&
+                    !consComCantus(n4, cf1) && consComCantus(n5, cf1)) { // Pattern n2 to n5 is C-D-D-C
+                for (n1 of shuffled1) {
+                    if (!consComCantus(n1, cf1)) continue;
+                    if (!isLeapPermitido(n1, n2)) continue;
+                    if (validarSequencia([n1,n2,n3,n4,n5], [])) return seqStd([n1,n2,n3,n4,n5]);
                 }
             }
         }
-        return null;
     }
 
     // ── NOTA DE PASSAGEM ACENTUADA ──
-    // Possibilidade a): cons → prep(cons) → np(diss) → res(cons) | cons
-    // Possibilidade b): pausa(h) → cons → prep(cons) | np(diss) → res(cons) → cons
     if (tratamento === 'F - Nota de passagem acentuada') {
-        const possibilidades = embaralhar(['a','b']);
-        for (const poss of possibilidades) {
+        for (const poss of embaralhar(['a','b'])) {
             if (poss === 'a') {
-                // estrutura: [cons, cons, diss, cons, cons]  — diss no tempo 3 (forte do 2º compasso simulado)
-                // Na representação: n1(cons cf1) n2(cons cf1/prep) n3(diss cf1) n4(cons cf1) | n5(cons cf2)
-                for (const dir of [1,-1]) {
+                // cons(extra) → cons(prep) → diss(NP) → cons(res) | cons(extra)
+                for (const dir of embaralhar([1,-1])) {
                     for (let xi = 0; xi < shuffled1.length; xi++) {
-                        const n2 = shuffled1[xi]; // preparação
-                        const n3 = scaleStep(n2, dir);
-                        if (!n3 || !inRangeScale(n3)) continue;
-                        if (consComCantus(n3, cf1)) continue; // n3 DEVE ser diss
-                        const n4 = scaleStep(n3, dir);
-                        if (!n4 || !inRangeScale(n4)) continue;
+                        const n2 = shuffled1[xi];
+                        const n3 = scaleStep(n2, dir); if (!n3||!inRangeScale(n3)) continue;
+                        if (consComCantus(n3, cf1)) continue;
+                        const n4 = scaleStep(n3, dir); if (!n4||!inRangeScale(n4)) continue;
                         if (!consComCantus(n4, cf1)) continue;
-                        for (const n1 of shuffled1.filter(n => consComCantus(n, cf1))) {
+                        for (const n1 of shuffled1) {
+                            if (!consComCantus(n1, cf1)) continue;
+                            if (!isLeapPermitido(n1, n2)) continue;
                             for (const n5 of shuffled2) {
-                                const seq = [n1, n2, n3, n4, n5];
-                                if (validarSequencia(seq)) return seqParaNotas3(seq, 'std');
+                                if (!isLeapPermitido(n4, n5)) continue;
+                                if (validarSequencia([n1,n2,n3,n4,n5], [0,4])) return seqStd([n1,n2,n3,n4,n5]);
                             }
                         }
                     }
                 }
             } else {
-                // estrutura: pausa(h) + cons(cf1) + cons(cf1/prep) | np(diss cf2) + res(cons cf2) + cons(cf2)
-                // Ritmo compasso 1: pausa_h q q; compasso 2: q q h
-                // Notas: [rest, n2, n3(prep), n4(np diss cf2), n5(res cons cf2), n6(cons cf2)]
-                // No array: [{duration:'h',rest:true}, n2(q), n3(q), n4(q), n5(q), n6(h)]
-                for (const dir of [1,-1]) {
+                // pausa(h) → cons(cf1) → cons(prep cf1) | diss(NP cf2) → cons(res cf2) → cons(cf2)
+                for (const dir of embaralhar([1,-1])) {
                     for (let xi = 0; xi < shuffled1.length; xi++) {
-                        const n3 = shuffled1[xi]; // preparação (4º tempo do 1º compasso)
-                        const n4 = scaleStep(n3, dir);
-                        if (!n4 || !inRangeScale(n4)) continue;
-                        // n4 deve ser diss com cf2 (1º tempo do 2º compasso)
-                        if (consComCantus(n4, cf2)) continue;
-                        const n5 = scaleStep(n4, dir);
-                        if (!n5 || !inRangeScale(n5)) continue;
+                        const n3 = shuffled1[xi]; // prep (4º tempo c1, cons cf1)
+                        const n4 = scaleStep(n3, dir); if (!n4||!inRangeScale(n4)) continue;
+                        if (consComCantus(n4, cf2)) continue; // NP: diss com cf2
+                        const n5 = scaleStep(n4, dir); if (!n5||!inRangeScale(n5)) continue;
                         if (!consComCantus(n5, cf2)) continue;
-                        for (const n2 of shuffled1.filter(n => consComCantus(n, cf1))) {
-                            for (const n6 of shuffled2.filter(n => consComCantus(n, cf2))) {
-                                // Verificar cruzamentos e paralelismos básicos
-                                const ok1 = !hasCruz(n2, cf1, cpAbaixo) && !hasCruz(n3, cf1, cpAbaixo);
-                                const ok2 = !hasCruz(n4, cf2, cpAbaixo) && !hasCruz(n5, cf2, cpAbaixo) && !hasCruz(n6, cf2, cpAbaixo);
-                                const okPar = !hasParalelasCP(n5, n6, cf2, cf2);
-                                if (ok1 && ok2 && okPar) {
-                                    return [
-                                        { note: null, duration: 'hr' }, // pausa de mínima
-                                        { note: n2,   duration: 'q'  },
-                                        { note: n3,   duration: 'q'  },
-                                        { note: n4,   duration: 'q'  },
-                                        { note: n5,   duration: 'q'  },
-                                        { note: n6,   duration: 'h'  }
-                                    ];
-                                }
+                        for (const n2 of shuffled1) {
+                            if (!consComCantus(n2, cf1)) continue;
+                            if (!isLeapPermitido(n2, n3)) continue;
+                            for (const n6 of shuffled2) {
+                                if (!consComCantus(n6, cf2)) continue;
+                                if (!isLeapPermitido(n5, n6)) continue;
+                                const ok = !hasCruz(n2,cf1,cpAbaixo) && !hasCruz(n3,cf1,cpAbaixo)
+                                        && !hasCruz(n4,cf2,cpAbaixo) && !hasCruz(n5,cf2,cpAbaixo) && !hasCruz(n6,cf2,cpAbaixo)
+                                        && !hasParalelasCP(n2,n3,cf1,cf1) && !hasParalelasCP(n5,n6,cf2,cf2);
+                                if (ok) return [
+                                    { note: null, duration: 'hr' },
+                                    { note: n2, duration: 'q' },
+                                    { note: n3, duration: 'q' },
+                                    { note: n4, duration: 'q' },
+                                    { note: n5, duration: 'q' },
+                                    { note: n6, duration: 'h' }
+                                ];
                             }
                         }
                     }
@@ -999,52 +1014,52 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     }
 
     // ── BORDADURA ACENTUADA ──
-    // Possibilidade a): cons → prep(cons) → B(diss) → res(cons) | cons
-    // Possibilidade b): pausa(h) → cons → prep(cons) | B(diss) → res(cons) → cons
     if (tratamento === 'G - Bordadura acentuada') {
-        const possibilidades = embaralhar(['a','b']);
-        for (const poss of possibilidades) {
+        for (const poss of embaralhar(['a','b'])) {
             if (poss === 'a') {
-                for (const dir of [1,-1]) {
+                // cons(extra) → cons(prep) → diss(B) → cons(res=prep) | cons(extra)
+                for (const dir of embaralhar([1,-1])) {
                     for (let xi = 0; xi < shuffled1.length; xi++) {
-                        const n2 = shuffled1[xi]; // preparação
-                        const n3 = scaleStep(n2, dir); // B
-                        if (!n3 || !inRangeScale(n3)) continue;
-                        if (consComCantus(n3, cf1)) continue; // B deve ser diss
-                        const n4 = n2; // res = prep (bordadura retorna)
-                        for (const n1 of shuffled1.filter(n => consComCantus(n, cf1))) {
+                        const n2 = shuffled1[xi];
+                        const n3 = scaleStep(n2, dir); if (!n3||!inRangeScale(n3)) continue;
+                        if (consComCantus(n3, cf1)) continue;
+                        const n4 = n2; // res = prep
+                        for (const n1 of shuffled1) {
+                            if (!consComCantus(n1, cf1)) continue;
+                            if (!isLeapPermitido(n1, n2)) continue;
                             for (const n5 of shuffled2) {
-                                const seq = [n1, n2, n3, n4, n5];
-                                if (validarSequencia(seq)) return seqParaNotas3(seq, 'std');
+                                if (!isLeapPermitido(n4, n5, undefined)) continue;
+                                if (validarSequencia([n1,n2,n3,n4,n5], [0,4])) return seqStd([n1,n2,n3,n4,n5]);
                             }
                         }
                     }
                 }
             } else {
-                // pausa(h) → cons(cf1) → prep(cons cf1) | B(diss cf2) → res(cons cf2) → cons(cf2)
-                for (const dir of [1,-1]) {
+                // pausa(h) → cons(cf1) → cons(prep cf1) | diss(B cf2) → cons(res=prep cf2) → cons(cf2)
+                for (const dir of embaralhar([1,-1])) {
                     for (let xi = 0; xi < shuffled1.length; xi++) {
-                        const n3 = shuffled1[xi]; // preparação (4º tempo 1º compasso)
-                        const n4 = scaleStep(n3, dir); // B (1º tempo 2º compasso, diss com cf2)
-                        if (!n4 || !inRangeScale(n4)) continue;
-                        if (consComCantus(n4, cf2)) continue; // deve ser diss com cf2
-                        const n5 = n3; // res = preparação (bordadura retorna)
+                        const n3 = shuffled1[xi];
+                        const n4 = scaleStep(n3, dir); if (!n4||!inRangeScale(n4)) continue;
+                        if (consComCantus(n4, cf2)) continue;
+                        const n5 = n3; // res = prep
                         if (!consComCantus(n5, cf2)) continue;
-                        for (const n2 of shuffled1.filter(n => consComCantus(n, cf1))) {
-                            for (const n6 of shuffled2.filter(n => consComCantus(n, cf2))) {
-                                const ok1 = !hasCruz(n2, cf1, cpAbaixo) && !hasCruz(n3, cf1, cpAbaixo);
-                                const ok2 = !hasCruz(n4, cf2, cpAbaixo) && !hasCruz(n5, cf2, cpAbaixo) && !hasCruz(n6, cf2, cpAbaixo);
-                                const okPar = !hasParalelasCP(n5, n6, cf2, cf2);
-                                if (ok1 && ok2 && okPar) {
-                                    return [
-                                        { note: null, duration: 'hr' },
-                                        { note: n2,   duration: 'q'  },
-                                        { note: n3,   duration: 'q'  },
-                                        { note: n4,   duration: 'q'  },
-                                        { note: n5,   duration: 'q'  },
-                                        { note: n6,   duration: 'h'  }
-                                    ];
-                                }
+                        for (const n2 of shuffled1) {
+                            if (!consComCantus(n2, cf1)) continue;
+                            if (!isLeapPermitido(n2, n3, undefined)) continue;
+                            for (const n6 of shuffled2) {
+                                if (!consComCantus(n6, cf2)) continue;
+                                if (!isLeapPermitido(n5, n6, undefined)) continue;
+                                const ok = !hasCruz(n2,cf1,cpAbaixo) && !hasCruz(n3,cf1,cpAbaixo)
+                                        && !hasCruz(n4,cf2,cpAbaixo) && !hasCruz(n5,cf2,cpAbaixo) && !hasCruz(n6,cf2,cpAbaixo)
+                                        && !hasParalelasCP(n2,n3,cf1,cf1) && !hasParalelasCP(n5,n6,cf2,cf2);
+                                if (ok) return [
+                                    { note: null, duration: 'hr' },
+                                    { note: n2, duration: 'q' },
+                                    { note: n3, duration: 'q' },
+                                    { note: n4, duration: 'q' },
+                                    { note: n5, duration: 'q' },
+                                    { note: n6, duration: 'h' }
+                                ];
                             }
                         }
                     }
@@ -1057,301 +1072,308 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     return null;
 }
 
-// Converte sequência de 5 notas para o formato de ritmo padrão da 3ª espécie: q q q q | w
-function seqParaNotas3(seq, tipo) {
-    if (tipo === 'std') {
-        return [
-            { note: seq[0], duration: 'q' },
-            { note: seq[1], duration: 'q' },
-            { note: seq[2], duration: 'q' },
-            { note: seq[3], duration: 'q' },
-            { note: seq[4], duration: 'w' }
-        ];
-    }
-    return null;
-}
-
 // ==================== 3ª ESPÉCIE — ANÁLISE ====================
 function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado) {
     if (!userCP || userCP.length < 5) return { ok: false, erro: 'Número de notas insuficiente (esperado: pelo menos 5)' };
     const cf1 = cantus[0].note;
     const cf2 = cantus[1].note;
 
-    // Detectar se é formato "pausa" (possibilidade b de NPa e Ba):
-    // 6 notas: [pausa_h, q, q, q, q, h]
     const isPausaFmt = userCP.length === 6 && userCP[0].duration === 'hr';
 
-    // Validar durações
     if (isPausaFmt) {
-        const duracoes = userCP.map(n => n.duration);
-        if (!(duracoes[0]==='hr' && duracoes[1]==='q' && duracoes[2]==='q' && duracoes[3]==='q' && duracoes[4]==='q' && duracoes[5]==='h')) {
-            return { ok: false, erro: 'Durações incorretas para formato com pausa (esperado: pausa_h · ♩ · ♩ | ♩ · ♩ · ♩)' };
-        }
+        const d = userCP.map(n => n.duration);
+        if (!(d[0]==='hr'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='q'&&d[5]==='h'))
+            return { ok: false, erro: 'Durações incorretas para formato com pausa (esperado: 𝄼 ♩ ♩ | ♩ ♩ ♩)' };
     } else if (userCP.length === 5) {
-        const duracoes = userCP.map(n => n.duration);
-        if (!(duracoes[0]==='q' && duracoes[1]==='q' && duracoes[2]==='q' && duracoes[3]==='q' && duracoes[4]==='w')) {
-            return { ok: false, erro: 'Durações incorretas (esperado: ♩ · ♩ · ♩ · ♩ | 𝅜)' };
-        }
+        const d = userCP.map(n => n.duration);
+        if (!(d[0]==='q'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='w'))
+            return { ok: false, erro: 'Durações incorretas (esperado: ♩ ♩ ♩ ♩ | 𝅜)' };
     } else {
         return { ok: false, erro: `Número de notas incorreto (esperado: 5 ou 6, encontrado: ${userCP.length})` };
     }
 
-    // Mapear notas reais (sem pausas)
     let notas, cfNotas;
     if (isPausaFmt) {
         notas   = [null, userCP[1].note, userCP[2].note, userCP[3].note, userCP[4].note, userCP[5].note];
-        cfNotas = [cf1,  cf1,            cf1,            cf2,            cf2,            cf2           ];
+        cfNotas = [cf1,  cf1,            cf1,            cf2,            cf2,            cf2];
     } else {
         notas   = userCP.map(n => n.note);
         cfNotas = [cf1, cf1, cf1, cf1, cf2];
     }
 
-    // Helper
-    const cons = (n, cf) => isConsonant(noteToNumber(n) - noteToNumber(cf));
-    const diss = (n, cf) => !cons(n, cf);
-    const cpAbaixo = noteToNumber(notas.find(n => n !== null)) < noteToNumber(cf1);
+    const cons  = (n, cf) => isConsonant(noteToNumber(n) - noteToNumber(cf));
+    const diss  = (n, cf) => !cons(n, cf);
+    const firstReal = notas.find(n => n !== null);
+    if (!firstReal) return { ok: false, erro: 'Nenhuma nota encontrada' };
+    const cpAbaixo = noteToNumber(firstReal) < noteToNumber(cf1);
 
-    // Verificações gerais: escala, cruzamento, paralelismos
+    // General checks: scale, crossing, parallels
     for (let i = 0; i < notas.length; i++) {
         if (notas[i] === null) continue;
-        const noteName = notas[i].split('/')[0];
-        if (!currentScale.includes(noteName)) return { ok: false, erro: `Nota "${notas[i]}" fora da escala` };
-        if (hasCruz(notas[i], cfNotas[i], cpAbaixo)) return { ok: false, erro: `Cruzamento de vozes na nota ${i+1}` };
+        if (!currentScale.includes(notas[i].split('/')[0]))
+            return { ok: false, erro: `Nota "${notas[i]}" está fora da escala` };
+        if (hasCruz(notas[i], cfNotas[i], cpAbaixo))
+            return { ok: false, erro: `Cruzamento de vozes na posição ${i+1}` };
     }
-
-    // Verificar paralelismo entre pares consecutivos de notas (excluindo nulls)
     for (let i = 0; i < notas.length - 1; i++) {
-        if (notas[i] === null || notas[i+1] === null) continue;
-        if (hasParalelasCP(notas[i], notas[i+1], cfNotas[i], cfNotas[i+1])) {
-            return { ok: false, erro: `Paralelas proibidas entre posições ${i+1} e ${i+2}` };
-        }
+        if (notas[i]===null||notas[i+1]===null) continue;
+        if (hasParalelasCP(notas[i], notas[i+1], cfNotas[i], cfNotas[i+1]))
+            return { ok: false, erro: `Paralelas proibidas entre as posições ${i+1} e ${i+2}` };
+        if (hasOcultas(notas[i], notas[i+1], cfNotas[i], cfNotas[i+1], cpAbaixo))
+            return { ok: false, erro: `Ocultas proibidas entre as posições ${i+1} e ${i+2}` };
     }
 
-    // Verificar ao menos uma dissonância presente
-    let hasDiss = false;
-    for (let i = 0; i < notas.length; i++) {
-        if (notas[i] !== null && diss(notas[i], cfNotas[i])) { hasDiss = true; break; }
-    }
-    if (!hasDiss) return { ok: false, erro: 'Nenhuma dissonância encontrada — use ao menos uma' };
+    // At least one dissonance
+    let hasDiss = notas.some((n,i) => n !== null && diss(n, cfNotas[i]));
+    if (!hasDiss) return { ok: false, erro: 'Nenhuma dissonância encontrada — inclua pelo menos uma' };
 
-    // ── Verificações específicas por tratamento ──
+    // ── Treatment-specific checks ──
     if (!isPausaFmt) {
         const [n1,n2,n3,n4,n5] = notas;
 
         if (tratamentoEsperado === 'A - Nota de passagem') {
-            // Verificar se ao menos uma NP está corretamente tratada
-            // NP: nota diss em grau conjunto, mesma direção prep→NP→res
-            const npEncontrada = verificarNPem3aEsp(notas, cfNotas);
-            if (!npEncontrada) return { ok: false, erro: 'Nenhuma nota de passagem corretamente tratada encontrada' };
-            // Verificar que não há dissonâncias sem tratamento
-            for (let i = 0; i < 4; i++) {
-                if (diss(notas[i], cfNotas[i])) {
-                    if (!ehNP(notas, cfNotas, i)) return { ok: false, erro: `Dissonância na posição ${i+1} não tratada como nota de passagem` };
-                }
-            }
+            return analisarNP3(notas, cfNotas);
         }
-
         if (tratamentoEsperado === 'B - Bordadura') {
-            const bEncontrada = verificarBordaduraEm3aEsp(notas, cfNotas);
-            if (!bEncontrada) return { ok: false, erro: 'Nenhuma bordadura corretamente tratada encontrada' };
-            for (let i = 0; i < 4; i++) {
-                if (diss(notas[i], cfNotas[i])) {
-                    if (!ehBordadura(notas, cfNotas, i)) return { ok: false, erro: `Dissonância na posição ${i+1} não tratada como bordadura` };
-                }
-            }
+            return analisarBordadura3(notas, cfNotas);
         }
-
         if (tratamentoEsperado === 'C - Cambiata') {
-            // Verificar se o padrão cambiata está presente em alguma das 4 posições possíveis
-            const cambEncontrada = verificarCambiataEm3aEsp(notas, cfNotas);
-            if (!cambEncontrada) return { ok: false, erro: 'Padrão de cambiata não encontrado (desc: −1gr,−2gr,+1gr,+1gr / asc: +1gr,+2gr,−1gr,−1gr)' };
+            return analisarCambiata3(notas, cfNotas);
         }
-
         if (tratamentoEsperado === 'D - Bordadura dupla') {
-            const bdEncontrada = verificarBordaduraDuplaEm3aEsp(notas, cfNotas);
-            if (!bdEncontrada) return { ok: false, erro: 'Padrão de bordadura dupla não encontrado (ex: prep → Bsup → Binf → prep)' };
+            return analisarBordaduraDupla3(notas, cfNotas);
         }
-
         if (tratamentoEsperado === 'E - Grupo de notas de passagem') {
-            const gnpEncontrado = verificarGrupoNPem3aEsp(notas, cfNotas);
-            if (!gnpEncontrado) return { ok: false, erro: 'Grupo de notas de passagem não encontrado (4 graus por grau conjunto, mesma direção)' };
+            return analisarGrupoNP3(notas, cfNotas);
         }
-
         if (tratamentoEsperado === 'F - Nota de passagem acentuada') {
-            // Verificar NP acentuada no formato std (possibilidade a)
-            const npaEncontrada = verificarNPAcentuadaStd(notas, cfNotas);
-            if (!npaEncontrada) return { ok: false, erro: 'Nota de passagem acentuada não encontrada (diss no 3º tempo, prep no 2º, res no 4º)' };
+            return analisarNPAcentuadaStd(notas, cfNotas);
         }
-
         if (tratamentoEsperado === 'G - Bordadura acentuada') {
-            const baEncontrada = verificarBordaduraAcentuadaStd(notas, cfNotas);
-            if (!baEncontrada) return { ok: false, erro: 'Bordadura acentuada não encontrada (diss no 3º tempo, prep no 2º, res=prep no 4º)' };
+            return analisarBordaduraAcentuadaStd(notas, cfNotas);
         }
     } else {
-        // Formato com pausa — notas: [null, n2, n3, n4, n5, n6]
-        // cfNotas: [cf1, cf1, cf1, cf2, cf2, cf2]
         const [, n2, n3, n4, n5, n6] = notas;
-
         if (tratamentoEsperado === 'F - Nota de passagem acentuada') {
-            // n3=prep(cons cf1), n4=NP(diss cf2), n5=res(cons cf2)
-            if (!cons(n3, cf1)) return { ok: false, erro: 'Preparação (3º tempo) deve ser consonante com o CF' };
-            if (!diss(n4, cf2)) return { ok: false, erro: 'Nota de passagem acentuada (1º tempo c.2) deve ser dissonante' };
-            if (!cons(n5, cf2)) return { ok: false, erro: 'Resolução (2º tempo c.2) deve ser consonante' };
-            if (!isStep(n3, n4)) return { ok: false, erro: 'Movimento prep→NP deve ser por grau' };
-            if (!isStep(n4, n5)) return { ok: false, erro: 'Movimento NP→res deve ser por grau' };
-            const dir1 = Math.sign(noteToNumber(n4) - noteToNumber(n3));
-            const dir2 = Math.sign(noteToNumber(n5) - noteToNumber(n4));
-            if (dir1 !== dir2) return { ok: false, erro: 'Movimento deve ser na mesma direção (prep→NP→res)' };
+            return analisarNPAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo);
         }
-
         if (tratamentoEsperado === 'G - Bordadura acentuada') {
-            // n3=prep(cons cf1), n4=B(diss cf2), n5=res=prep(cons cf2)
-            if (!cons(n3, cf1)) return { ok: false, erro: 'Preparação (3º tempo) deve ser consonante com o CF' };
-            if (!diss(n4, cf2)) return { ok: false, erro: 'Bordadura acentuada (1º tempo c.2) deve ser dissonante' };
-            if (!cons(n5, cf2)) return { ok: false, erro: 'Resolução (2º tempo c.2) deve ser consonante' };
-            if (!isStep(n3, n4)) return { ok: false, erro: 'Movimento prep→B deve ser por grau' };
-            if (!isStep(n4, n5)) return { ok: false, erro: 'Movimento B→res deve ser por grau' };
-            if (noteToNumber(n3) !== noteToNumber(n5)) return { ok: false, erro: 'Resolução deve retornar à nota de preparação (bordadura)' };
+            return analisarBordaduraAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo);
         }
     }
+    return { ok: true };
+}
+
+// ── Helper: check that "extra" positions are cons and move narrowly ──
+function checkExtras(notas, cfNotas, extraIdxs) {
+    for (const idx of extraIdxs) {
+        const n = notas[idx]; if (!n) continue;
+        if (!isConsonant(noteToNumber(n) - noteToNumber(cfNotas[idx])))
+            return { ok: false, erro: `Posição ${idx+1} deve ser consonante com o CF (nota extra)` };
+        if (idx > 0 && notas[idx-1] && !isLeapPermitido(notas[idx-1], n, notas[idx+1] ))
+            return { ok: false, erro: `Salto melódico para a posição ${idx+1} deve ser <= 5ª (nota extra)` };
+        if (idx < notas.length-1 && notas[idx+1] && !isLeapPermitido(n, notas[idx+1], notas[idx+2]))
+            return { ok: false, erro: `Salto melódico saindo da posição ${idx+1} deve ser <= 5ª (nota extra)` };
+    }
+    return null; // no error
+}
+
+// ── Nota de passagem ──
+function analisarNP3(notas, cfNotas) {
+    const [n1,n2,n3,n4,n5] = notas;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    const diss = (n,cf) => !cons(n,cf);
+
+    // Check that every dissonance is a proper NP
+    for (let i = 0; i < 4; i++) {
+        if (!diss(notas[i], cfNotas[i])) continue;
+        // notas[i] is dissonant — verify NP pattern around it
+        if (i === 0) return { ok: false, erro: 'Posição 1 (tempo forte) não pode ser dissonante na nota de passagem' };
+        const prep = notas[i-1], np = notas[i], res = notas[i+1];
+        if (!prep) return { ok: false, erro: `Posição ${i+1}: falta nota de preparação` };
+        if (!res)  return { ok: false, erro: `Posição ${i+1}: falta nota de resolução` };
+        if (!isStep(prep, np))  return { ok: false, erro: `Nota de passagem na posição ${i+1}: movimento prep→NP não é por grau (deve ser 2ª)` };
+        if (!isStep(np, res))   return { ok: false, erro: `Nota de passagem na posição ${i+1}: movimento NP→res não é por grau (deve ser 2ª)` };
+        const dir1 = Math.sign(noteToNumber(np)-noteToNumber(prep));
+        const dir2 = Math.sign(noteToNumber(res)-noteToNumber(np));
+        if (dir1 !== dir2) return { ok: false, erro: `Nota de passagem na posição ${i+1}: prep→NP→res deve manter a mesma direção` };
+        if (!cons(prep, cfNotas[i-1])) return { ok: false, erro: `Preparação da NP (posição ${i}): deve ser consonante com o CF` };
+        if (!cons(res,  cfNotas[i+1])) return { ok: false, erro: `Resolução da NP (posição ${i+2}): deve ser consonante com o CF` };
+    }
+    // Check extra notes consonance and narrow leap
+    // Identify which positions are "free" (not prep, not NP, not res)
+    // (simpler: just check all non-dissonant positions for narrow leaps)
+    for (let i = 0; i < notas.length - 1; i++) {
+        if (!isLeapPermitido(notas[i], notas[i+1], notas[i+2]) && isConsonant(noteToNumber(notas[i])-noteToNumber(cfNotas[i])) && isConsonant(noteToNumber(notas[i+1])-noteToNumber(cfNotas[i+1])))
+            return { ok: false, erro: `Salto entre posições ${i+1} e ${i+2} excede uma 5ª (saltos maiores do que a 5ª devem ser compensados)` };
+    }
+    return { ok: true };
+}
+
+// ── Bordadura ──
+function analisarBordadura3(notas, cfNotas) {
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    const diss = (n,cf) => !cons(n,cf);
+    for (let i = 0; i < 4; i++) {
+        if (!diss(notas[i], cfNotas[i])) continue;
+        if (i === 0) return { ok: false, erro: 'Posição 1 (tempo forte) não pode ser dissonante na bordadura' };
+        const prep = notas[i-1], B = notas[i], res = notas[i+1];
+        if (!prep||!res) return { ok: false, erro: `Bordadura na posição ${i+1}: faltam prep ou resolução` };
+        if (!isStep(prep, B))  return { ok: false, erro: `Bordadura na posição ${i+1}: movimento prep→B deve ser por grau (2ª)` };
+        if (!isStep(B, res))   return { ok: false, erro: `Bordadura na posição ${i+1}: movimento B→res deve ser por grau (2ª)` };
+        const dir1 = Math.sign(noteToNumber(B)-noteToNumber(prep));
+        const dir2 = Math.sign(noteToNumber(res)-noteToNumber(B));
+        if (dir1 === dir2) return { ok: false, erro: `Bordadura na posição ${i+1}: prep→B e B→res devem ter direções opostas` };
+        if (noteToNumber(prep) !== noteToNumber(res)) return { ok: false, erro: `Bordadura na posição ${i+1}: resolução deve retornar à nota de preparação` };
+        if (!cons(prep, cfNotas[i-1])) return { ok: false, erro: `Preparação da bordadura (posição ${i}): deve ser consonante com o CF` };
+        if (!cons(res,  cfNotas[i+1])) return { ok: false, erro: `Resolução da bordadura (posição ${i+2}): deve ser consonante com o CF` };
+    }
+    for (let i = 0; i < notas.length - 1; i++) {
+        if (!isLeapPermitido(notas[i], notas[i+1]) && isConsonant(noteToNumber(notas[i])-noteToNumber(cfNotas[i])) && isConsonant(noteToNumber(notas[i+1])-noteToNumber(cfNotas[i+1])))
+            return { ok: false, erro: `Salto entre posições ${i+1} e ${i+2} excede uma 4ª (notas livres devem mover por menos de uma 5ª)` };
+    }
+    return { ok: true };
+}
+
+// ── Cambiata ──
+function analisarCambiata3(notas, cfNotas) {
+    const [n1,n2,n3,n4,n5] = notas;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+
+    // Detect direction
+    const dir = Math.sign(noteToNumber(n2)-noteToNumber(n1));
+    if (dir === 0) return { ok: false, erro: 'Cambiata: n1→n2 não pode ser uníssono' };
+
+    // n1→n2: step (2ª)
+    if (!isStep(n1, n2)) return { ok: false, erro: 'Cambiata: movimento n1→n2 deve ser por grau (2ª)' };
+    // n2→n3: third (3ª)
+    if (!isThird(n2, n3)) return { ok: false, erro: 'Cambiata: movimento n2→n3 deve ser um salto de 3ª' };
+    // direction of n2→n3 must equal dir
+    if (Math.sign(noteToNumber(n3)-noteToNumber(n2)) !== dir) return { ok: false, erro: 'Cambiata: o salto de 3ª (n2→n3) deve continuar na mesma direção de n1→n2' };
+    // n3→n4: step (2ª), opposite direction
+    if (!isStep(n3, n4)) return { ok: false, erro: 'Cambiata: movimento n3→n4 deve ser por grau (2ª)' };
+    if (Math.sign(noteToNumber(n4)-noteToNumber(n3)) === dir) return { ok: false, erro: 'Cambiata: n3→n4 deve ser na direção oposta à do início' };
+    // n4→n5: step (2ª), same direction as n3→n4
+    if (!isStep(n4, n5)) return { ok: false, erro: 'Cambiata: movimento n4→n5 (para a semibreve) deve ser por grau (2ª)' };
+    if (Math.sign(noteToNumber(n5)-noteToNumber(n4)) !== Math.sign(noteToNumber(n4)-noteToNumber(n3)))
+        return { ok: false, erro: 'Cambiata: n4→n5 deve continuar na mesma direção que n3→n4' };
+    // n1 cons
+    if (!cons(n1, cfNotas[0])) return { ok: false, erro: 'Cambiata: n1 deve ser consonante com o CF' };
+    // n5 cons
+    if (!cons(n5, cfNotas[4])) return { ok: false, erro: 'Cambiata: semibreve final (n5) deve ser consonante com o CF' };
+    // max 2 diss among n2,n3,n4
+    const dissCount = [n2,n3,n4].filter((n,i) => !cons(n, cfNotas[i+1])).length;
+    if (dissCount > 2) return { ok: false, erro: 'Cambiata: no máximo 2 dissonâncias são permitidas entre n2, n3 e n4' };
 
     return { ok: true };
 }
 
-// ── Helpers de análise para 3ª espécie ──
-function ehNP(notas, cfNotas, i) {
-    // pos i é NP: notas[i-1]=prep, notas[i]=diss, notas[i+1]=res, mesma direção
-    if (i < 1 || i > notas.length - 2) return false;
-    const prep = notas[i-1], np = notas[i], res = notas[i+1];
-    if (!prep || !np || !res) return false;
-    if (!isStep(prep, np)) return false;
-    if (!isStep(np, res)) return false;
-    const dir1 = Math.sign(noteToNumber(np) - noteToNumber(prep));
-    const dir2 = Math.sign(noteToNumber(res) - noteToNumber(np));
-    return dir1 === dir2;
-}
-
-function verificarNPem3aEsp(notas, cfNotas) {
-    for (let i = 1; i <= 3; i++) {
-        if (!isConsonant(noteToNumber(notas[i]) - noteToNumber(cfNotas[i])) && ehNP(notas, cfNotas, i)) return true;
-    }
-    return false;
-}
-
-function ehBordadura(notas, cfNotas, i) {
-    if (i < 1 || i > notas.length - 2) return false;
-    const prep = notas[i-1], B = notas[i], res = notas[i+1];
-    if (!prep || !B || !res) return false;
-    if (!isStep(prep, B)) return false;
-    if (!isStep(B, res)) return false;
-    const dir1 = Math.sign(noteToNumber(B) - noteToNumber(prep));
-    const dir2 = Math.sign(noteToNumber(res) - noteToNumber(B));
-    return dir1 !== dir2 && noteToNumber(prep) === noteToNumber(res);
-}
-
-function verificarBordaduraEm3aEsp(notas, cfNotas) {
-    for (let i = 1; i <= 3; i++) {
-        if (!isConsonant(noteToNumber(notas[i]) - noteToNumber(cfNotas[i])) && ehBordadura(notas, cfNotas, i)) return true;
-    }
-    return false;
-}
-
-function verificarCambiataEm3aEsp(notas, cfNotas) {
-    // Padrão descendente: −1,−2,+1,+1 (em graus de escala)
-    // Padrão ascendente: +1,+2,−1,−1
-    if (notas.length < 5) return false;
-    // Verificar a partir de posição 0 até 1 (os 4 primeiros graus do compasso 1)
-    for (let start = 0; start <= 1; start++) {
-        const [a,b,c,d] = [notas[start], notas[start+1], notas[start+2], notas[start+3]];
-        if (!a||!b||!c||!d) continue;
-        const s = i => noteToNumber(notas[start+i]);
-        const idxB = currentScale.indexOf(b.split('/')[0]);
-        const idxC = currentScale.indexOf(c.split('/')[0]);
-        // graus no array de escala (tratando oitavas)
-        const grau = (x, y) => {
-            const nx = noteToNumber(x), ny = noteToNumber(y);
-            // conta graus na escala entre x e y
-            let g = 0, cur = nx, dir = Math.sign(ny - nx);
-            if (dir === 0) return 0;
-            while (cur !== ny) {
-                cur += dir;
-                if (currentScale.includes(numberToNote(cur).split('/')[0])) g++;
-                if (Math.abs(cur - nx) > 24) return 99;
-            }
-            return g * dir;
-        };
-        const g1 = grau(a,b), g2 = grau(b,c), g3 = grau(c,d);
-        const isDesc = (g1 === -1 && g2 === -2 && g3 === 1);
-        const isAsc  = (g1 ===  1 && g2 ===  2 && g3 === -1);
-        if (!isDesc && !isAsc) continue;
-        // n2 (b) deve ser dissonante
-        if (consComCantus(b, cfNotas[start+1])) continue;
-        // n3 (c) deve ser consonante
-        if (!consComCantus(c, cfNotas[start+2])) continue;
-        return true;
-    }
-    return false;
-}
-
-function verificarBordaduraDuplaEm3aEsp(notas, cfNotas) {
-    if (notas.length < 5) return false;
-    // prep → Bsup → Binf → prep OU prep → Binf → Bsup → prep
-    // n1=prep, n2=B1, n3=B2, n4=prep (igual a n1)
-    const [n1, n2, n3, n4] = notas;
-    if (!n1||!n2||!n3||!n4) return false;
-    if (noteToNumber(n1) !== noteToNumber(n4)) return false;
-    const B1sup = noteToNumber(n2) > noteToNumber(n1);
-    const B2inf = noteToNumber(n3) < noteToNumber(n1);
-    const B1inf = noteToNumber(n2) < noteToNumber(n1);
-    const B2sup = noteToNumber(n3) > noteToNumber(n1);
-    const ordemValida = (B1sup && B2inf) || (B1inf && B2sup);
-    if (!ordemValida) return false;
-    if (!isStep(n1, n2) || !isStep(n1, n3)) return false;
-    return true;
-}
-
-function verificarGrupoNPem3aEsp(notas, cfNotas) {
-    if (notas.length < 5) return false;
-    // 4 notas por grau conjunto, mesma direção; n4 consonante; n2 ou n3 dissonantes
-    for (const dir of [1,-1]) {
-        const [n1,n2,n3,n4] = notas;
-        if (!n1||!n2||!n3||!n4) continue;
-        if (!isStep(n1,n2)||!isStep(n2,n3)||!isStep(n3,n4)) continue;
-        const d12 = Math.sign(noteToNumber(n2)-noteToNumber(n1));
-        const d23 = Math.sign(noteToNumber(n3)-noteToNumber(n2));
-        const d34 = Math.sign(noteToNumber(n4)-noteToNumber(n3));
-        if (d12!==d23||d23!==d34) continue;
-        if (!consComCantus(n4, cfNotas[3])) continue;
-        if (consComCantus(n2, cfNotas[1]) && consComCantus(n3, cfNotas[2])) continue; // ao menos 1 diss
-        return true;
-    }
-    return false;
-}
-
-function verificarNPAcentuadaStd(notas, cfNotas) {
-    // Possibilidade a): cons → prep(cons) → NP(diss) → res(cons) | cons
-    // A diss cai no 3º tempo (index 2), prep no 2º (index 1), res no 4º (index 3)
+// ── Bordadura dupla ──
+function analisarBordaduraDupla3(notas, cfNotas) {
     const [n1,n2,n3,n4,n5] = notas;
-    if (!n1||!n2||!n3||!n4||!n5) return false;
-    if (!isConsonant(noteToNumber(n2) - noteToNumber(cfNotas[1]))) return false; // prep cons
-    if (isConsonant(noteToNumber(n3) - noteToNumber(cfNotas[2]))) return false;  // NP diss
-    if (!isConsonant(noteToNumber(n4) - noteToNumber(cfNotas[3]))) return false; // res cons
-    if (!isStep(n2,n3)||!isStep(n3,n4)) return false;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    if (!cons(n1, cfNotas[0])) return { ok: false, erro: 'Bordadura dupla: n1 deve ser consonante com o CF' };
+    if (!cons(n4, cfNotas[3])) return { ok: false, erro: 'Bordadura dupla: n4 deve ser consonante com o CF (retorno à nota de preparação)' };
+    if (noteToNumber(n1) !== noteToNumber(n4)) return { ok: false, erro: 'Bordadura dupla: n4 deve retornar à mesma nota de n1' };
+    if (!isStep(n1, n2)) return { ok: false, erro: 'Bordadura dupla: movimento n1→n2 deve ser por grau (2ª)' };
+    if (!isStep(n1, n3)) return { ok: false, erro: 'Bordadura dupla: movimento n1→n3 deve ser por grau (2ª)' };
+    const d1 = Math.sign(noteToNumber(n2)-noteToNumber(n1));
+    const d2 = Math.sign(noteToNumber(n3)-noteToNumber(n1));
+    if (d1 === d2) return { ok: false, erro: 'Bordadura dupla: n2 e n3 devem ser bordaduras de lados opostos (superior e inferior)' };
+    if (!cons(n5, cfNotas[4])) return { ok: false, erro: 'Bordadura dupla: semibreve final deve ser consonante com o CF' };
+    if (!isLeapPermitido(n4, n5)) return { ok: false, erro: 'Bordadura dupla: movimento n4→n5 excede uma 4ª' };
+    return { ok: true };
+}
+
+// ── Grupo de notas de passagem ──
+function analisarGrupoNP3(notas, cfNotas) {
+    const [n1,n2,n3,n4,n5] = notas;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    if (!cons(n1, cfNotas[0])) return { ok: false, erro: 'Grupo de NP: n1 deve ser consonante com o CF' };
+    if (!cons(n4, cfNotas[3])) return { ok: false, erro: 'Grupo de NP: n4 deve ser consonante com o CF' };
+    if (!isStep(n1,n2)) return { ok: false, erro: 'Grupo de NP: n1→n2 deve ser por grau (2ª)' };
+    if (!isStep(n2,n3)) return { ok: false, erro: 'Grupo de NP: n2→n3 deve ser por grau (2ª)' };
+    if (!isStep(n3,n4)) return { ok: false, erro: 'Grupo de NP: n3→n4 deve ser por grau (2ª)' };
+    const d12 = Math.sign(noteToNumber(n2)-noteToNumber(n1));
+    const d23 = Math.sign(noteToNumber(n3)-noteToNumber(n2));
+    const d34 = Math.sign(noteToNumber(n4)-noteToNumber(n3));
+    if (!(d12===d23&&d23===d34)) return { ok: false, erro: 'Grupo de NP: o movimento deve ser na mesma direção do início ao fim (n1→n2→n3→n4)' };
+    const dissCount = [n2,n3].filter((n,i) => !cons(n, cfNotas[i+1])).length;
+    if (dissCount === 0) return { ok: false, erro: 'Grupo de NP: ao menos uma nota interna (n2 ou n3) deve ser dissonante' };
+    if (!isLeapPermitido(n4, n5)) return { ok: false, erro: 'Grupo de NP: movimento n4→n5 (para a semibreve) deve ser menor que uma 5ª' };
+    return { ok: true };
+}
+
+// ── NP Acentuada — formato padrão ──
+function analisarNPAcentuadaStd(notas, cfNotas) {
+    // cons(extra) → cons(prep) → diss(NP) → cons(res) | cons(extra)
+    // Positions: 0=extra, 1=prep, 2=NP(diss), 3=res, 4=extra
+    const [n1,n2,n3,n4,n5] = notas;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    if (!cons(n1, cfNotas[0])) return { ok: false, erro: 'NP acentuada: posição 1 deve ser consonante com o CF' };
+    if (!cons(n2, cfNotas[1])) return { ok: false, erro: 'NP acentuada: preparação (posição 2) deve ser consonante com o CF' };
+    if (cons(n3, cfNotas[2]))  return { ok: false, erro: 'NP acentuada: posição 3 deve ser dissonante com o CF' };
+    if (!cons(n4, cfNotas[3])) return { ok: false, erro: 'NP acentuada: resolução (posição 4) deve ser consonante com o CF' };
+    if (!cons(n5, cfNotas[4])) return { ok: false, erro: 'NP acentuada: semibreve final deve ser consonante com o CF' };
+    if (!isStep(n2, n3)) return { ok: false, erro: 'NP acentuada: movimento prep→NP (posições 2→3) deve ser por grau (2ª)' };
+    if (!isStep(n3, n4)) return { ok: false, erro: 'NP acentuada: movimento NP→res (posições 3→4) deve ser por grau (2ª)' };
     const dir1 = Math.sign(noteToNumber(n3)-noteToNumber(n2));
     const dir2 = Math.sign(noteToNumber(n4)-noteToNumber(n3));
-    return dir1 === dir2;
+    if (dir1 !== dir2) return { ok: false, erro: 'NP acentuada: prep→NP→res deve manter a mesma direção' };
+    if (!isLeapPermitido(n1, n2)) return { ok: false, erro: 'NP acentuada: salto entre posições 1 e 2 deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n4, n5)) return { ok: false, erro: 'NP acentuada: salto entre posição 4 e a semibreve deve ser menor que uma 5ª' };
+    return { ok: true };
 }
 
-function verificarBordaduraAcentuadaStd(notas, cfNotas) {
-    // Possibilidade a): cons → prep(cons) → B(diss) → res(=prep,cons) | cons
+// ── Bordadura Acentuada — formato padrão ──
+function analisarBordaduraAcentuadaStd(notas, cfNotas) {
     const [n1,n2,n3,n4,n5] = notas;
-    if (!n1||!n2||!n3||!n4||!n5) return false;
-    if (!isConsonant(noteToNumber(n2) - noteToNumber(cfNotas[1]))) return false;
-    if (isConsonant(noteToNumber(n3) - noteToNumber(cfNotas[2]))) return false;
-    if (!isConsonant(noteToNumber(n4) - noteToNumber(cfNotas[3]))) return false;
-    if (!isStep(n2,n3)||!isStep(n3,n4)) return false;
-    if (noteToNumber(n2) !== noteToNumber(n4)) return false; // res=prep
-    return true;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    if (!cons(n1, cfNotas[0])) return { ok: false, erro: 'Bordadura acentuada: posição 1 deve ser consonante com o CF' };
+    if (!cons(n2, cfNotas[1])) return { ok: false, erro: 'Bordadura acentuada: preparação (posição 2) deve ser consonante com o CF' };
+    if (cons(n3, cfNotas[2]))  return { ok: false, erro: 'Bordadura acentuada: posição 3 deve ser dissonante com o CF' };
+    if (!cons(n4, cfNotas[3])) return { ok: false, erro: 'Bordadura acentuada: resolução (posição 4) deve ser consonante com o CF' };
+    if (!cons(n5, cfNotas[4])) return { ok: false, erro: 'Bordadura acentuada: semibreve final deve ser consonante com o CF' };
+    if (!isStep(n2, n3)) return { ok: false, erro: 'Bordadura acentuada: movimento prep→B (posições 2→3) deve ser por grau (2ª)' };
+    if (!isStep(n3, n4)) return { ok: false, erro: 'Bordadura acentuada: movimento B→res (posições 3→4) deve ser por grau (2ª)' };
+    if (noteToNumber(n2) !== noteToNumber(n4)) return { ok: false, erro: 'Bordadura acentuada: resolução (posição 4) deve retornar à nota de preparação (posição 2)' };
+    if (!isLeapPermitido(n1, n2)) return { ok: false, erro: 'Bordadura acentuada: salto entre posições 1 e 2 deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n4, n5)) return { ok: false, erro: 'Bordadura acentuada: salto entre posição 4 e a semibreve deve ser menor que uma 5ª' };
+    return { ok: true };
+}
+
+// ── NP Acentuada — formato com pausa ──
+function analisarNPAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo) {
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    if (!cons(n2, cf1)) return { ok: false, erro: 'NP acentuada (pausa): posição 2 deve ser consonante com o CF' };
+    if (!cons(n3, cf1)) return { ok: false, erro: 'NP acentuada (pausa): preparação (posição 3) deve ser consonante com o CF' };
+    if (cons(n4, cf2))  return { ok: false, erro: 'NP acentuada (pausa): posição 4 (1º tempo c.2) deve ser dissonante com o CF' };
+    if (!cons(n5, cf2)) return { ok: false, erro: 'NP acentuada (pausa): resolução (posição 5) deve ser consonante com o CF' };
+    if (!cons(n6, cf2)) return { ok: false, erro: 'NP acentuada (pausa): posição 6 deve ser consonante com o CF' };
+    if (!isStep(n3, n4)) return { ok: false, erro: 'NP acentuada (pausa): movimento prep→NP (posições 3→4) deve ser por grau (2ª)' };
+    if (!isStep(n4, n5)) return { ok: false, erro: 'NP acentuada (pausa): movimento NP→res (posições 4→5) deve ser por grau (2ª)' };
+    const dir1 = Math.sign(noteToNumber(n4)-noteToNumber(n3));
+    const dir2 = Math.sign(noteToNumber(n5)-noteToNumber(n4));
+    if (dir1 !== dir2) return { ok: false, erro: 'NP acentuada (pausa): prep→NP→res deve manter a mesma direção' };
+    if (!isLeapPermitido(n2, n3)) return { ok: false, erro: 'NP acentuada (pausa): salto entre posições 2 e 3 deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n5, n6)) return { ok: false, erro: 'NP acentuada (pausa): salto entre posições 5 e 6 deve ser menor que uma 5ª' };
+    return { ok: true };
+}
+
+// ── Bordadura Acentuada — formato com pausa ──
+function analisarBordaduraAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo) {
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    if (!cons(n2, cf1)) return { ok: false, erro: 'Bordadura acentuada (pausa): posição 2 deve ser consonante com o CF' };
+    if (!cons(n3, cf1)) return { ok: false, erro: 'Bordadura acentuada (pausa): preparação (posição 3) deve ser consonante com o CF' };
+    if (cons(n4, cf2))  return { ok: false, erro: 'Bordadura acentuada (pausa): posição 4 (1º tempo c.2) deve ser dissonante com o CF' };
+    if (!cons(n5, cf2)) return { ok: false, erro: 'Bordadura acentuada (pausa): resolução (posição 5) deve ser consonante com o CF' };
+    if (!cons(n6, cf2)) return { ok: false, erro: 'Bordadura acentuada (pausa): posição 6 deve ser consonante com o CF' };
+    if (!isStep(n3, n4)) return { ok: false, erro: 'Bordadura acentuada (pausa): movimento prep→B (posições 3→4) deve ser por grau (2ª)' };
+    if (!isStep(n4, n5)) return { ok: false, erro: 'Bordadura acentuada (pausa): movimento B→res (posições 4→5) deve ser por grau (2ª)' };
+    if (noteToNumber(n3) !== noteToNumber(n5)) return { ok: false, erro: 'Bordadura acentuada (pausa): resolução (posição 5) deve retornar à nota de preparação (posição 3)' };
+    if (!isLeapPermitido(n2, n3)) return { ok: false, erro: 'Bordadura acentuada (pausa): salto entre posições 2 e 3 deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n5, n6)) return { ok: false, erro: 'Bordadura acentuada (pausa): salto entre posições 5 e 6 deve ser menor que uma 5ª' };
+    return { ok: true };
 }
 
 function analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado) {
@@ -1375,13 +1397,19 @@ function analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado) {
     if (hasParalelas(n1.note, n3.note, cantus1, cantus2)) {
         const intMod = Math.abs(noteToNumber(n1.note) - noteToNumber(cantus1)) % 12;
         const tipo = (intMod === 0) ? '8ªs' : '5ªs';
-        return { ok: false, erro: `${tipo} paralelas entre preparação→resolução e cantus` };
+        return { ok: false, erro: `${tipo} intermitentes entre preparação→resolução e cantus` };
     }
     if (hasParalelas(n2.note, n3.note, cantus1, cantus2)) {
         const intMod = Math.abs(noteToNumber(n2.note) - noteToNumber(cantus1)) % 12;
         const tipo = (intMod === 0) ? '8ªs' : '5ªs';
         return { ok: false, erro: `${tipo} paralelas entre dissonância→resolução e cantus` };
     }
+    if (hasOcultas(n2.note, n3.note, cantus1, cantus2, cpAbaixo)) {
+        const intMod = Math.abs(noteToNumber(n2.note) - noteToNumber(cantus1)) % 12;
+        const tipo = (intMod === 0) ? '8ªs' : '5ªs';
+        return { ok: false, erro: `${tipo} ocultas entre dissonância→resolução e cantus` };
+    }
+
     const num1 = noteToNumber(n1.note);
     const num2 = noteToNumber(n2.note);
     const num3 = noteToNumber(n3.note);
@@ -1437,16 +1465,15 @@ function validarRespostaEscrita(q) {
 }
 
 // ==================== GERAÇÃO DE QUESTÕES ====================
-function generateQuestions(qtd = 4) {
+function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
     const tratamentos = [...tratamentosPorEspecie[currentSpecies]];
-    const tratamentosParaGerar = [...tratamentosGeraveis[currentSpecies]];
+    const tratamentosParaGerar = embaralhar([...tratamentosGeraveis[currentSpecies]]);
     const tipoA = [], tipoB = [], tipoC = [];
     const assinaturasUsadas = new Set();
 
-    for (let i = 0; i < qtd; i++) {
+    for (let i = 0; i < qtdA; i++) {
         const tratamento = tratamentosParaGerar[i % tratamentosParaGerar.length];
-
-        // Tipo A — par independente
+        // Tipo A
         let parA = null;
         for (let t = 0; t < 40; t++) {
             const isUpperVoice = Math.random() > 0.5;
@@ -1474,8 +1501,10 @@ function generateQuestions(qtd = 4) {
                 contraClef: bestClef(parA.contraponto)
             });
         }
-
-        // Tipo B — par independente
+    }
+    for (let i = 0; i < qtdB; i++) {
+        const tratamento = tratamentosParaGerar[i % tratamentosParaGerar.length];
+        // Tipo B
         let parB = null;
         for (let t = 0; t < 40; t++) {
             const isUpperVoice = Math.random() > 0.5;
@@ -1493,7 +1522,7 @@ function generateQuestions(qtd = 4) {
             tipoB.push({
                 id: `b${i}`,
                 tipo: 'b',
-                enunciado: 'Analise a <strong>partitura</strong> e classifique o tratamento de dissonância:',
+                enunciado: 'Analise a <strong>partitura</strong> e classifique o(s) tratamento(s) de dissonância:',
                 tratamento,
                 resposta: tratamento,
                 partitura: {
@@ -1508,7 +1537,7 @@ function generateQuestions(qtd = 4) {
     }
 
     const tratamentosC = tratamentos.filter(t => t !== 'D - Sem Dissonâncias');
-    for (let i = 0; i < qtd; i++) {
+    for (let i = 0; i < qtdC; i++) {
         const tratamentoC = tratamentosC[i % tratamentosC.length];
         let parValido = null;
         for (let t = 0; t < 40; t++) {
@@ -1527,12 +1556,12 @@ function generateQuestions(qtd = 4) {
         let enunciado3;
         if (currentSpecies === 3) {
             const isPausaTratamento = tratamentoC === 'F - Nota de passagem acentuada' || tratamentoC === 'G - Bordadura acentuada';
-            const ritmoPadrao = '♩ · ♩ · ♩ · ♩ · | · 𝅜';
-            const ritmoPausa  = '<em>Formato padrão:</em> ♩ · ♩ · ♩ · ♩ · | · 𝅜 &nbsp;|&nbsp; <em>ou com pausa:</em> 𝄽(𝅗𝅥) · ♩ · ♩ · | · ♩ · ♩ · ♩';
+            const ritmoPadrao = '♩ ♩ ♩ ♩ | 𝅜';
+            const ritmoPausa  = '<em>Formato padrão:</em> ♩ ♩ ♩ ♩ | 𝅜 &nbsp;|&nbsp; <em>ou com pausa:</em> 𝄼 ♩ ♩ | ♩ ♩ ♩';
             const ritmoStr = isPausaTratamento ? ritmoPausa : ritmoPadrao;
-            enunciado3 = `Escreva um contraponto de 3ª espécie usando pelo menos uma dissonância tratada como <strong>"${tratamentoC}"</strong>.<br><small>Estrutura rítmica: ${ritmoStr}</small>`;
+            enunciado3 = `Escreva um contraponto de 3ª espécie usando pelo menos uma dissonância tratada como <strong>"${tratamentoC}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; lletter-spacing: 6px;">${ritmoStr}</span>`;
         } else {
-            enunciado3 = `Escreva uma dissonância do tipo <strong>"${tratamentoC}"</strong> no contraponto — use a estrutura rítmica: <strong>mínima · mínima · semibreve</strong> (use o teclado abaixo):`;
+            enunciado3 = `Escreva uma dissonância do tipo <strong>"${tratamentoC}"</strong> no contraponto — use a estrutura rítmica: <strong>mínima mínima semibreve</strong> (use o teclado abaixo):`;
         }
 
         tipoC.push({
@@ -1630,9 +1659,10 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             return notasComp.map(n => {
                 try {
                     // Pausa de mínima
+                    const restKey = clef === 'bass' ? 'd/3' : 'b/4';
                     if (n.duration === 'hr' || n.note === null) {
                         return new Vex.Flow.StaveNote({
-                            keys: ['b/4'],
+                            keys: [restKey],
                             duration: 'hr',
                             clef: clef
                         });
@@ -2116,8 +2146,9 @@ function generateReport(last) {
             <div class="stat-card">
                 <h4>🎼 Detalhamento por Questão</h4>
                 ${last.questionAttempts.map((tent, idx) => `
-                    <p><strong>Q${idx+1}</strong> (${questions[idx]?.tipo?.toUpperCase() || '?'}): 
-                    ${last.questionScores[idx] > 0 ? '✅' : '❌'} 
+                    <p><strong>Q${idx+1}</strong>
+                    (${questions[idx]?.tipo?.toUpperCase() || '?'} — ${questions[idx]?.tratamento?.slice(4) || '?'}):
+                    ${last.questionScores[idx] > 0 ? '✅' : '❌'}
                     ${tent} tentativa(s) → pontuação ${last.questionScores[idx].toFixed(2)}</p>
                 `).join('')}
             </div>
@@ -2147,8 +2178,11 @@ function startExercise() {
     if (!nomeInput?.value.trim()) { alert('Por favor, digite seu nome!'); return; }
     
     currentSpecies = parseInt(document.getElementById('species-select')?.value || '2');
+    const ss = document.getElementById('species-select');
+    if (ss) ss.disabled = true;
+
     generateRandomTonality();
-    questions = generateQuestions(5);
+    questions = generateQuestions(5, 3, 4);
     
     if (questions.length === 0) { 
         alert('Erro: Nenhuma questão foi gerada. Tente novamente ou mude a espécie.'); 
