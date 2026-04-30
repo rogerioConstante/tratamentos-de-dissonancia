@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v29.04.19</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v26.04.20</title>
 
     <!-- BIBLIOTECAS -->
     <script src="./libs/vexflow.js"></script>
@@ -91,7 +91,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Contraponto & Dissonâncias</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v29.04.19</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.20</div>
     </div>
 
     <div class="config-panel">
@@ -127,7 +127,7 @@
     <div class="button-panel">
         <button id="start-btn" class="success">▶ INICIAR EXERCÍCIO</button>
         <button id="generate-report-btn" disabled>📊 GERAR RELATÓRIO PDF</button>
-        <button id="reset-btn">🔄 NOVA TENTATIVA</button>
+        <button id="reset-btn" class="danger" disabled>⏹ FINALIZAR EXERCÍCIO</button>
     </div>
 
     <div class="main-content">
@@ -164,6 +164,7 @@
     </div>
 </div>
 <div id="modal" class="modal"><div class="modal-content"><p id="modal-message">Confirmar ação?</p><div class="modal-buttons"><button id="modal-confirm">Confirmar</button><button id="modal-cancel">Cancelar</button></div></div></div>
+<div id="finalize-modal" class="modal"><div class="modal-content"><p id="finalize-modal-message">Deseja salvar o relatório da tentativa atual antes de finalizar?</p><div class="modal-buttons"><button id="finalize-save-btn" class="success">💾 Salvar PDF e finalizar</button><button id="finalize-discard-btn" class="danger">🗑️ Finalizar sem salvar</button><button id="finalize-cancel-btn" class="secondary">Cancelar</button></div></div></div>
 
 <script>
 // ==================== TONE.JS ====================
@@ -482,6 +483,7 @@ let startTimeDate = null;
 let endTime = null;
 let attemptId = 0;
 let attemptsHistory = [];
+let sessionAttemptCount = 0;
 let currentQuestionResponse = null;
 let userContraponto = [];
 let selectedDuration = 'h';
@@ -625,14 +627,13 @@ function isThird(a, b) {
 }
 function isLeapPermitido(a, b, next) {
     const semi = Math.abs(noteToNumber(b) - noteToNumber(a));
-    if (semi < 7) return true;                          // ≤ 4ª: sempre OK
-    if (semi === 7) return false;                        // 5ª dim: proibido
+    if (semi < 6) return true;                          // ≤ 4ª: sempre OK
     if (semi === 8 || semi === 9 || semi === 12) {       // 6ª ou 8ª
         if (!next) return false;                         // sem compensação: proibido
         const comp = noteToNumber(next) - noteToNumber(b);
         const dirSalto = Math.sign(noteToNumber(b) - noteToNumber(a));
         return Math.sign(comp) === -dirSalto             // direção contrária
-            && Math.abs(comp) < 7;                       // < 5ª
+            && Math.abs(comp) <= 5;                       // compensação até 4ª
     }
     return false;                                        // 7ª, 9ª+: proibido
 }
@@ -1229,8 +1230,8 @@ function analisarBordadura3(notas, cfNotas) {
         if (!cons(res,  cfNotas[i+1])) return { ok: false, erro: `Resolução da bordadura (posição ${i+2}): deve ser consonante com o CF` };
     }
     for (let i = 0; i < notas.length - 1; i++) {
-        if (!isLeapPermitido(notas[i], notas[i+1]) && isConsonant(noteToNumber(notas[i])-noteToNumber(cfNotas[i])) && isConsonant(noteToNumber(notas[i+1])-noteToNumber(cfNotas[i+1])))
-            return { ok: false, erro: `Salto entre posições ${i+1} e ${i+2} excede uma 4ª (notas livres devem mover por menos de uma 5ª)` };
+        if (!isLeapPermitido(notas[i], notas[i+1], notas[i+2]) && isConsonant(noteToNumber(notas[i])-noteToNumber(cfNotas[i])) && isConsonant(noteToNumber(notas[i+1])-noteToNumber(cfNotas[i+1])))
+            return { ok: false, erro: `Salto entre posições ${i+1} e ${i+2} excede uma 5ª (saltos maiores do que a 5ª devem ser compensados)` };
     }
     return { ok: true };
 }
@@ -1281,7 +1282,7 @@ function analisarBordaduraDupla3(notas, cfNotas) {
     const d2 = Math.sign(noteToNumber(n3)-noteToNumber(n1));
     if (d1 === d2) return { ok: false, erro: 'Bordadura dupla: n2 e n3 devem ser bordaduras de lados opostos (superior e inferior)' };
     if (!cons(n5, cfNotas[4])) return { ok: false, erro: 'Bordadura dupla: semibreve final deve ser consonante com o CF' };
-    if (!isLeapPermitido(n4, n5)) return { ok: false, erro: 'Bordadura dupla: movimento n4→n5 excede uma 4ª' };
+    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'Bordadura dupla: movimento n4→n5 excede uma 5ª' };
     return { ok: true };
 }
 
@@ -1300,7 +1301,7 @@ function analisarGrupoNP3(notas, cfNotas) {
     if (!(d12===d23&&d23===d34)) return { ok: false, erro: 'Grupo de NP: o movimento deve ser na mesma direção do início ao fim (n1→n2→n3→n4)' };
     const dissCount = [n2,n3].filter((n,i) => !cons(n, cfNotas[i+1])).length;
     if (dissCount === 0) return { ok: false, erro: 'Grupo de NP: ao menos uma nota interna (n2 ou n3) deve ser dissonante' };
-    if (!isLeapPermitido(n4, n5)) return { ok: false, erro: 'Grupo de NP: movimento n4→n5 (para a semibreve) deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'Grupo de NP: movimento n4→n5 (para a semibreve) deve ser menor que uma 5ª' };
     return { ok: true };
 }
 
@@ -1320,8 +1321,8 @@ function analisarNPAcentuadaStd(notas, cfNotas) {
     const dir1 = Math.sign(noteToNumber(n3)-noteToNumber(n2));
     const dir2 = Math.sign(noteToNumber(n4)-noteToNumber(n3));
     if (dir1 !== dir2) return { ok: false, erro: 'NP acentuada: prep→NP→res deve manter a mesma direção' };
-    if (!isLeapPermitido(n1, n2)) return { ok: false, erro: 'NP acentuada: salto entre posições 1 e 2 deve ser menor que uma 5ª' };
-    if (!isLeapPermitido(n4, n5)) return { ok: false, erro: 'NP acentuada: salto entre posição 4 e a semibreve deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n1, n2, n3)) return { ok: false, erro: 'NP acentuada: salto entre posições 1 e 2 deve ser menor que uma 5ª (saltos maiores do que a 5ª devem ser compensados)' };
+    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'NP acentuada: salto entre posição 4 e a semibreve deve ser menor que uma 5ª' };
     return { ok: true };
 }
 
@@ -1337,8 +1338,8 @@ function analisarBordaduraAcentuadaStd(notas, cfNotas) {
     if (!isStep(n2, n3)) return { ok: false, erro: 'Bordadura acentuada: movimento prep→B (posições 2→3) deve ser por grau (2ª)' };
     if (!isStep(n3, n4)) return { ok: false, erro: 'Bordadura acentuada: movimento B→res (posições 3→4) deve ser por grau (2ª)' };
     if (noteToNumber(n2) !== noteToNumber(n4)) return { ok: false, erro: 'Bordadura acentuada: resolução (posição 4) deve retornar à nota de preparação (posição 2)' };
-    if (!isLeapPermitido(n1, n2)) return { ok: false, erro: 'Bordadura acentuada: salto entre posições 1 e 2 deve ser menor que uma 5ª' };
-    if (!isLeapPermitido(n4, n5)) return { ok: false, erro: 'Bordadura acentuada: salto entre posição 4 e a semibreve deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n1, n2, n3)) return { ok: false, erro: 'Bordadura acentuada: salto entre posições 1 e 2 deve ser menor que uma 5ª (saltos maiores do que a 5ª devem ser compensados)' };
+    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'Bordadura acentuada: salto entre posição 4 e a semibreve deve ser menor que uma 5ª' };
     return { ok: true };
 }
 
@@ -1355,8 +1356,8 @@ function analisarNPAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo) {
     const dir1 = Math.sign(noteToNumber(n4)-noteToNumber(n3));
     const dir2 = Math.sign(noteToNumber(n5)-noteToNumber(n4));
     if (dir1 !== dir2) return { ok: false, erro: 'NP acentuada (pausa): prep→NP→res deve manter a mesma direção' };
-    if (!isLeapPermitido(n2, n3)) return { ok: false, erro: 'NP acentuada (pausa): salto entre posições 2 e 3 deve ser menor que uma 5ª' };
-    if (!isLeapPermitido(n5, n6)) return { ok: false, erro: 'NP acentuada (pausa): salto entre posições 5 e 6 deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n2, n3, n4)) return { ok: false, erro: 'NP acentuada (pausa): salto entre posições 2 e 3 deve ser menor que uma 5ª (saltos maiores do que a 5ª devem ser compensados)' };
+    if (!isLeapPermitido(n5, n6, null)) return { ok: false, erro: 'NP acentuada (pausa): salto entre posições 5 e 6 deve ser menor que uma 5ª' };
     return { ok: true };
 }
 
@@ -1371,8 +1372,8 @@ function analisarBordaduraAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo)
     if (!isStep(n3, n4)) return { ok: false, erro: 'Bordadura acentuada (pausa): movimento prep→B (posições 3→4) deve ser por grau (2ª)' };
     if (!isStep(n4, n5)) return { ok: false, erro: 'Bordadura acentuada (pausa): movimento B→res (posições 4→5) deve ser por grau (2ª)' };
     if (noteToNumber(n3) !== noteToNumber(n5)) return { ok: false, erro: 'Bordadura acentuada (pausa): resolução (posição 5) deve retornar à nota de preparação (posição 3)' };
-    if (!isLeapPermitido(n2, n3)) return { ok: false, erro: 'Bordadura acentuada (pausa): salto entre posições 2 e 3 deve ser menor que uma 5ª' };
-    if (!isLeapPermitido(n5, n6)) return { ok: false, erro: 'Bordadura acentuada (pausa): salto entre posições 5 e 6 deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n2, n3, n4)) return { ok: false, erro: 'Bordadura acentuada (pausa): salto entre posições 2 e 3 deve ser menor que uma 5ª (saltos maiores do que a 5ª devem ser compensados)' };
+    if (!isLeapPermitido(n5, n6, null)) return { ok: false, erro: 'Bordadura acentuada (pausa): salto entre posições 5 e 6 deve ser menor que uma 5ª' };
     return { ok: true };
 }
 
@@ -1557,7 +1558,7 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
         if (currentSpecies === 3) {
             const isPausaTratamento = tratamentoC === 'F - Nota de passagem acentuada' || tratamentoC === 'G - Bordadura acentuada';
             const ritmoPadrao = '♩ ♩ ♩ ♩ | 𝅜';
-            const ritmoPausa  = '<em>Formato padrão:</em> ♩ ♩ ♩ ♩ | 𝅜 &nbsp;|&nbsp; <em>ou com pausa:</em> 𝄼 ♩ ♩ | ♩ ♩ ♩';
+            const ritmoPausa  = '♩ ♩ ♩ ♩ | 𝅜 &nbsp;|&nbsp;ou&nbsp; 𝄼 ♩ ♩ | ♩ ♩ ♩';
             const ritmoStr = isPausaTratamento ? ritmoPausa : ritmoPadrao;
             enunciado3 = `Escreva um contraponto de 3ª espécie usando pelo menos uma dissonância tratada como <strong>"${tratamentoC}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; lletter-spacing: 6px;">${ritmoStr}</span>`;
         } else {
@@ -2094,11 +2095,85 @@ function endExercise() {
     };
     
     attemptsHistory.push(reg); 
+    sessionAttemptCount++;
     saveHistory(); 
     generateReport(reg);
     
     const rb = document.getElementById('generate-report-btn'); 
     if (rb) rb.disabled = false;
+
+    onExerciseEnd();
+}
+
+// Chamada ao fim do exercício: reativa start-btn como "NOVA TENTATIVA"
+function onExerciseEnd() {
+    const sb = document.getElementById('start-btn');
+    if (sb) {
+        sb.disabled = false;
+        sb.innerHTML = '🔄 NOVA TENTATIVA';
+        sb.className = 'success';
+    }
+}
+
+// Reseta a interface para o estado inicial (idle), chamado por "Finalizar Exercício"
+function finalizeExercise() {
+    // Limpa dados da sessão atual
+    questions = [];
+    currentQuestionIndex = 0;
+    userAnswers = [];
+    questionAttempts = [];
+    questionScores = [];
+    currentQuestionResponse = null;
+    userContraponto = [];
+    questionAnswered = false;
+    sessionAttemptCount = 0;
+
+    // Limpa canvas
+    const canvas = document.getElementById('notation-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Oculta relatório
+    const ra = document.getElementById('report-area');
+    if (ra) ra.classList.remove('show');
+    const rc = document.getElementById('report-content');
+    if (rc) rc.innerHTML = '';
+
+    // Reseta área de questão
+    const qt = document.getElementById('question-text');
+    if (qt) qt.innerHTML = '-';
+    const pi = document.getElementById('progress-info');
+    if (pi) pi.innerHTML = 'Clique em "INICIAR" para começar';
+    const ac = document.getElementById('alternatives-container');
+    if (ac) ac.innerHTML = '';
+
+    // Oculta piano virtual
+    const pianoDiv = document.getElementById('virtual-piano');
+    if (pianoDiv) pianoDiv.style.display = 'none';
+
+    // Libera seletor de espécie
+    const ss = document.getElementById('species-select');
+    if (ss) ss.disabled = false;
+
+    // Reseta botões
+    const sb = document.getElementById('start-btn');
+    if (sb) {
+        sb.disabled = false;
+        sb.innerHTML = '▶ INICIAR EXERCÍCIO';
+        sb.className = 'success';
+    }
+    const rb = document.getElementById('generate-report-btn');
+    if (rb) rb.disabled = true;
+    const fb = document.getElementById('reset-btn');
+    if (fb) fb.disabled = true;
+
+    // Reseta botões next/play
+    const nb = document.getElementById('next-btn');
+    if (nb) { nb.disabled = true; nb.innerHTML = '⏩ Próxima'; }
+    const pb = document.getElementById('play-btn');
+    if (pb) pb.disabled = true;
 }
 
 function msParaHHMMSS(ms) { const totalSeg = Math.floor(ms / 1000); return `${String(Math.floor(totalSeg / 3600)).padStart(2,'0')}:${String(Math.floor((totalSeg % 3600) / 60)).padStart(2,'0')}:${String(totalSeg % 60).padStart(2,'0')}`; }
@@ -2133,7 +2208,9 @@ function generateReport(last) {
             </div>
             <div class="stat-card">
                 <h4>⏱️ Estatísticas de Tempo</h4>
-                <p><strong>Tentativas totais:</strong> ${attemptsHistory.length}</p>
+                // DEPOIS
+                <p><strong>Tentativas nesta sessão:</strong> ${sessionAttemptCount}</p>
+                <p><strong>Tentativas no histórico:</strong> ${attemptsHistory.length}</p>
                 <p><strong>Média:</strong> ${msParaHHMMSS(mediaMs)}</p>
                 <p><strong>Mediana:</strong> ${msParaHHMMSS(medianaMs)}</p>
             </div>
@@ -2182,7 +2259,7 @@ function startExercise() {
     if (ss) ss.disabled = true;
 
     generateRandomTonality();
-    questions = generateQuestions(5, 3, 4);
+    questions = generateQuestions(0, 0, 10);
     
     if (questions.length === 0) { 
         alert('Erro: Nenhuma questão foi gerada. Tente novamente ou mude a espécie.'); 
@@ -2203,11 +2280,18 @@ function startExercise() {
     renderCurrentQuestion();
     
     const sb = document.getElementById('start-btn'); 
-    if (sb) sb.disabled = true;
+    if (sb) {
+        sb.disabled = true;
+        sb.innerHTML = '▶ INICIAR EXERCÍCIO';
+    }
     const rb = document.getElementById('generate-report-btn'); 
     if (rb) rb.disabled = true;
     const ra = document.getElementById('report-area'); 
     if (ra) ra.classList.remove('show');
+
+    // Ativa o botão Finalizar Exercício a partir do primeiro início
+    const fb = document.getElementById('reset-btn');
+    if (fb) fb.disabled = false;
 }
 
 document.addEventListener('keydown', e => {
@@ -2249,7 +2333,29 @@ document.querySelectorAll('.duration-btn').forEach(btn => {
 const defBtn = document.querySelector('[data-duration="h"]'); if (defBtn) defBtn.classList.add('active');
 document.querySelectorAll('button').forEach(btn => btn.addEventListener('click', activateAudio));
 const sb = document.getElementById('start-btn'); if (sb) sb.onclick = startExercise;
-const rb = document.getElementById('reset-btn'); if (rb) rb.onclick = () => location.reload();
+const rb = document.getElementById('reset-btn'); if (rb) rb.onclick = () => {
+    // Abre o modal de confirmação de finalização
+    const fm = document.getElementById('finalize-modal');
+    if (fm) fm.style.display = 'flex';
+
+    const saveBtn = document.getElementById('finalize-save-btn');
+    const discardBtn = document.getElementById('finalize-discard-btn');
+    const cancelBtn = document.getElementById('finalize-cancel-btn');
+
+    const closeModal = () => { if (fm) fm.style.display = 'none'; };
+
+    if (saveBtn) saveBtn.onclick = async () => {
+        closeModal();
+        // Só exporta se houver relatório disponível
+        const rc = document.getElementById('report-content');
+        if (rc && rc.innerHTML.trim()) {
+            await exportPDF();
+        }
+        finalizeExercise();
+    };
+    if (discardBtn) discardBtn.onclick = () => { closeModal(); finalizeExercise(); };
+    if (cancelBtn) cancelBtn.onclick = () => closeModal();
+};
 const rpt = document.getElementById('generate-report-btn'); if (rpt) rpt.onclick = exportPDF;
 const clr = document.getElementById('clear-all-notes'); if (clr) clr.onclick = clearAllNotes;
 
