@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v26.04.20</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v26.04.21</title>
 
     <!-- BIBLIOTECAS -->
     <script src="./libs/vexflow.js"></script>
@@ -91,7 +91,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Contraponto & Dissonâncias</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.20</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.21</div>
     </div>
 
     <div class="config-panel">
@@ -127,7 +127,7 @@
     <div class="button-panel">
         <button id="start-btn" class="success">▶ INICIAR EXERCÍCIO</button>
         <button id="generate-report-btn" disabled>📊 GERAR RELATÓRIO PDF</button>
-        <button id="reset-btn" class="danger" disabled>⏹ FINALIZAR EXERCÍCIO</button>
+        <button id="reset-btn">FINALIZAR</button>
     </div>
 
     <div class="main-content">
@@ -150,7 +150,8 @@
                 <button class="duration-btn" data-duration="h">𝅗𝅥 Mínima <span class="shortcut-hint">(2)</span></button>
                 <button class="duration-btn" data-duration="q">♩ Semínima <span class="shortcut-hint">(4)</span></button>
                 <button class="duration-btn" data-duration="8">♪ Colcheia <span class="shortcut-hint">(8)</span></button>
-                <button class="duration-btn species3-only" data-duration="hr" id="rest-btn" style="display:none;">𝄽 Pausa Mínima <span class="shortcut-hint">(R)</span></button>
+                <button class="duration-btn species3-only" data-duration="hr" id="rest-btn" style="display:none;">𝄼 Pausa Mínima <span class="shortcut-hint">(R)</span></button>
+                <button class="duration-btn species3-only" data-duration="qr" id="rest-qr-btn" style="display:none;">𝄽 Pausa Semínima <span class="shortcut-hint">(Q)</span></button>
             </div>
             <div class="piano-keys" id="piano-keys"></div>
             <div class="notes-list" id="notes-list">
@@ -164,7 +165,6 @@
     </div>
 </div>
 <div id="modal" class="modal"><div class="modal-content"><p id="modal-message">Confirmar ação?</p><div class="modal-buttons"><button id="modal-confirm">Confirmar</button><button id="modal-cancel">Cancelar</button></div></div></div>
-<div id="finalize-modal" class="modal"><div class="modal-content"><p id="finalize-modal-message">Deseja salvar o relatório da tentativa atual antes de finalizar?</p><div class="modal-buttons"><button id="finalize-save-btn" class="success">💾 Salvar PDF e finalizar</button><button id="finalize-discard-btn" class="danger">🗑️ Finalizar sem salvar</button><button id="finalize-cancel-btn" class="secondary">Cancelar</button></div></div></div>
 
 <script>
 // ==================== TONE.JS ====================
@@ -324,7 +324,7 @@ async function playScoreTone(cantus, contraponto) {
         if (!toneReady) { await initToneAdvanced(); if (!toneReady) throw new Error('Falha ao inicializar áudio'); }
 
         const now = Tone.now();
-        const durMap = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25, 'hr': 1.0 };
+        const durMap = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25, 'hr': 1.0, 'qr': 0.5 };
         const instrumentType = document.getElementById('instrument-select')?.value || 'fm';
 
         if (instrumentType === 'sampler') {
@@ -342,7 +342,7 @@ async function playScoreTone(cantus, contraponto) {
             let tCP = 0;
             (contraponto || []).forEach(n => {
                 const dur = durMap[n.duration] || 1;
-                if (n.note !== null && n.duration !== 'hr') {
+                if (n.note !== null && n.duration !== 'hr' && n.duration !== 'qr') {
                     const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
                     samplerPiano.triggerAttackRelease(noteName, dur * 1.05, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
                 }
@@ -384,13 +384,13 @@ async function playScore(cantus, contraponto) { await playScoreTone(cantus, cont
 
 // ==================== CONFIGURAÇÕES GLOBAIS ====================
 const tratamentosPorEspecie = {
-    2: ['A - Nota de passagem', 'B - Bordadura Inferior', 'C - Bordadura Superior', 'D - Sem Dissonâncias'],
-    3: ['A - Nota de passagem', 'B - Bordadura', 'C - Cambiata', 'D - Bordadura dupla', 'E - Grupo de notas de passagem', 'F - Nota de passagem acentuada', 'G - Bordadura acentuada'],
-    4: ['A - Nota de passagem', 'B - Bordadura', 'H - Suspensão e retardo'],
-    5: ['A - Nota de passagem', 'B - Bordadura', 'C - Cambiata', 'D - Bordadura dupla', 'E - Grupo de notas de passagem', 'F - Nota de passagem acentuada', 'G - Bordadura acentuada', 'H - Suspensão e retardo', 'I - Suspensão com resolução interrompida', 'J - Apojatura', 'K - Antecipação']
+    2: ['Nota de passagem', 'Bordadura Inferior', 'Bordadura Superior', 'Sem Dissonâncias'],
+    3: ['Nota de passagem', 'Bordadura', 'Cambiata', 'Bordadura dupla', 'Grupo de notas de passagem', 'Nota de passagem acentuada', 'Bordadura acentuada'],
+    4: ['Nota de passagem', 'Bordadura', 'Suspensão e retardo'],
+    5: ['Nota de passagem', 'Bordadura', 'Cambiata', 'Bordadura dupla', 'Grupo de notas de passagem', 'Nota de passagem acentuada', 'Bordadura acentuada', 'Suspensão e retardo', 'Suspensão com resolução interrompida', 'Apojatura', 'Antecipação']
 };
 const tratamentosGeraveis = {
-    2: ['A - Nota de passagem', 'B - Bordadura Inferior', 'C - Bordadura Superior'],
+    2: ['Nota de passagem', 'Bordadura Inferior', 'Bordadura Superior'],
     3: [...tratamentosPorEspecie[3]],
     4: [...tratamentosPorEspecie[4]],
     5: [...tratamentosPorEspecie[5]]
@@ -545,6 +545,9 @@ function hasCruzamento(cpNote, cantusNote, cpAbaixo) {
 }
 
 function hasParalelas(cpA, cpB, cantusA, cantusB) {
+    // Movimento oblíquo: uma das vozes não se move → não é paralelo
+    if (noteToNumber(cpA) === noteToNumber(cpB)) return false;
+    if (noteToNumber(cantusA) === noteToNumber(cantusB)) return false;
     const intA = Math.abs(noteToNumber(cpA) - noteToNumber(cantusA)) % 12;
     const intB = Math.abs(noteToNumber(cpB) - noteToNumber(cantusB)) % 12;
     if (intA !== intB) return false;
@@ -571,14 +574,14 @@ function gerarContraponto2aEspecie(tratamento, cantusNotes, isUpperVoice) {
     for (let x = 0; x < preparacoes.length; x++) {
         let dissonancia, resolucao;
         const prep = preparacoes[x];
-        if (tratamento === 'A - Nota de passagem') {
+        if (tratamento === 'Nota de passagem') {
             const dir = Math.random() > 0.5 ? 1 : -1;
             dissonancia = scaleStep(prep, dir);
             resolucao = scaleStep(dissonancia, dir);
-        } else if (tratamento === 'B - Bordadura Inferior') {
+        } else if (tratamento === 'Bordadura Inferior') {
             dissonancia = scaleStep(prep, -1);
             resolucao = prep;
-        } else if (tratamento === 'C - Bordadura Superior') {
+        } else if (tratamento === 'Bordadura Superior') {
             dissonancia = scaleStep(prep, 1);
             resolucao = prep;
         }
@@ -627,13 +630,13 @@ function isThird(a, b) {
 }
 function isLeapPermitido(a, b, next) {
     const semi = Math.abs(noteToNumber(b) - noteToNumber(a));
-    if (semi < 6) return true;                          // ≤ 4ª: sempre OK
-    if (semi === 8 || semi === 9 || semi === 12) {       // 6ª ou 8ª
+    if (semi <= 7) return true;                          // ≤ 5ª justa: sempre OK
+    if (semi === 8 || semi === 9 || semi === 12) {       // 6ª m, 6ª M ou 8ª
         if (!next) return false;                         // sem compensação: proibido
         const comp = noteToNumber(next) - noteToNumber(b);
         const dirSalto = Math.sign(noteToNumber(b) - noteToNumber(a));
         return Math.sign(comp) === -dirSalto             // direção contrária
-            && Math.abs(comp) <= 5;                       // compensação até 4ª
+            && Math.abs(comp) <= 7;                      // por grau ou até 5ª justa
     }
     return false;                                        // 7ª, 9ª+: proibido
 }
@@ -751,7 +754,7 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     }
 
     // ── NOTA DE PASSAGEM ──
-    if (tratamento === 'A - Nota de passagem') {
+    if (tratamento === 'Nota de passagem') {
         for (const poss of embaralhar(['a','b','c'])) {
             for (let xi = 0; xi < shuffled1.length; xi++) {
                 if (poss === 'a') {
@@ -819,7 +822,7 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     }
 
     // ── BORDADURA ──
-    if (tratamento === 'B - Bordadura') {
+    if (tratamento === 'Bordadura') {
         for (const poss of embaralhar(['a','b','c'])) {
             for (const dir of embaralhar([1,-1])) {
                 for (let xi = 0; xi < shuffled1.length; xi++) {
@@ -877,7 +880,7 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     // ── CAMBIATA (padrão Schoenberg) ──
     // Descendente: −2ª, −3ª, +2ª, +2ª  |  Ascendente: +2ª, +3ª, −2ª, −2ª
     // n1 cons; n2,n3,n4 podem ser diss (máx 2 diss entre os três); n5 cons
-    if (tratamento === 'C - Cambiata') {
+    if (tratamento === 'Cambiata') {
         for (const direcao of embaralhar(['desc','asc'])) {
             for (let xi = 0; xi < shuffled1.length; xi++) {
                 const n1 = shuffled1[xi];
@@ -911,17 +914,48 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     }
 
     // ── BORDADURA DUPLA ──
-    if (tratamento === 'D - Bordadura dupla') {
-        for (let xi = 0; xi < shuffled1.length; xi++) {
-            const prep = shuffled1[xi];
-            for (const [d1, d2] of [[1,-1],[-1,1]]) {
-                const B1 = scaleStep(prep, d1); if (!B1||!inRangeScale(B1)) continue;
-                const B2 = scaleStep(prep, d2); if (!B2||!inRangeScale(B2)) continue;
-                if (!isLeapPermitido(B1, B2)) continue;
-                for (const n5 of shuffled2) {
-                    if (!consComCantus(n5, cf2)) continue;
-                    if (!isLeapPermitido(prep, n5)) continue;
-                    if (validarSequencia([prep,B1,B2,prep,n5], [])) return seqStd([prep,B1,B2,prep,n5]);
+    if (tratamento === 'Bordadura dupla') {
+        for (const start of embaralhar([0, 1])) {
+            const cfNucleo = [
+                start === 0 ? cf1 : cf1,
+                start === 0 ? cf1 : cf1,
+                start === 0 ? cf1 : cf1,
+                start === 0 ? cf1 : cf2
+            ];
+            // cf por posição no array de 5: [cf1, cf1, cf1, cf1, cf2]
+            const cfAll = [cf1, cf1, cf1, cf1, cf2];
+
+            for (const [d1, d2] of embaralhar([[1,-1],[-1,1]])) {
+                for (let xi = 0; xi < shuffled1.length; xi++) {
+                    const prep = shuffled1[xi];
+                    if (!consComCantus(prep, cfNucleo[0])) continue;
+
+                    const B1 = scaleStep(prep, d1); if (!B1 || !inRangeScale(B1)) continue;
+                    const B2 = scaleStep(prep, d2); if (!B2 || !inRangeScale(B2)) continue;
+                    if (!isLeapPermitido(B1, B2)) continue;
+
+                    // retorno deve ser consonante com o CF da posição start+3
+                    if (!consComCantus(prep, cfAll[start + 3])) continue;
+
+                    const nucleo = [prep, B1, B2, prep]; // posições start..start+3
+
+                    if (start === 0) {
+                        // núcleo em [n1..n4], n5 é nota livre (semibreve, cf2)
+                        for (const n5 of shuffled2) {
+                            if (!consComCantus(n5, cf2)) continue;
+                            if (!isLeapPermitido(prep, n5)) continue;
+                            const seq = [...nucleo, n5];
+                            if (validarSequencia(seq, [4])) return seqStd(seq);
+                        }
+                    } else {
+                        // núcleo em [n2..n5], n1 é nota livre (semínima, cf1)
+                        for (const n1 of shuffled1) {
+                            if (!consComCantus(n1, cf1)) continue;
+                            if (!isLeapPermitido(n1, prep, B1)) continue;
+                            const seq = [n1, ...nucleo];
+                            if (validarSequencia(seq, [0])) return seqStd(seq);
+                        }
+                    }
                 }
             }
         }
@@ -929,36 +963,56 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     }
 
     // ── GRUPO DE NOTAS DE PASSAGEM ──
-    if (tratamento === 'E - Grupo de notas de passagem') {
-        for (let xi = 0; xi < shuffled1.length; xi++) {
-            const dir = Math.random() > 0.5 ? 1 : -1;
-            let n1 = shuffled1[xi]; // Consonant (already picked)
-            let n2 = scaleStep(n1, dir);
-            let n3 = scaleStep(n2, dir);
-            let n4 = scaleStep(n3, dir);
-            let n5 = scaleStep(n4, dir);
+    if (tratamento === 'Grupo de notas de passagem') {
+        // cfAll: mapeamento de CF para cada uma das 5 posições do array [q,q,q,q,w]
+        const cfAll = [cf1, cf1, cf1, cf1, cf2];
 
-            // Validation logic:
-            if (consComCantus(n1, cf1) && !consComCantus(n2, cf1) &&
-                !consComCantus(n3, cf1) && consComCantus(n4, cf1)) { // Pattern n1 to n4 is C-D-D-C
-                for (n5 of shuffled2) {
-                    if (!consComCantus(n5, cf2)) continue;
-                    if (!isLeapPermitido(n4, n5)) continue;
-                    if (validarSequencia([n1,n2,n3,n4,n5], [])) return seqStd([n1,n2,n3,n4,n5]);
-                }
-            } else if (consComCantus(n2, cf1) && !consComCantus(n3, cf1) &&
-                    !consComCantus(n4, cf1) && consComCantus(n5, cf1)) { // Pattern n2 to n5 is C-D-D-C
-                for (n1 of shuffled1) {
-                    if (!consComCantus(n1, cf1)) continue;
-                    if (!isLeapPermitido(n1, n2)) continue;
-                    if (validarSequencia([n1,n2,n3,n4,n5], [])) return seqStd([n1,n2,n3,n4,n5]);
+        for (const start of embaralhar([0, 1])) {
+            for (const dir of embaralhar([1, -1])) {
+                for (let xi = 0; xi < shuffled1.length; xi++) {
+                    const na = shuffled1[xi];
+                    if (!consComCantus(na, cfAll[start])) continue;
+
+                    const nb = scaleStep(na, dir); if (!nb || !inRangeScale(nb)) continue;
+                    const nc = scaleStep(nb, dir); if (!nc || !inRangeScale(nc)) continue;
+                    const nd = scaleStep(nc, dir); if (!nd || !inRangeScale(nd)) continue;
+
+                    // nd deve ser consonante com o CF da posição start+3
+                    if (!consComCantus(nd, cfAll[start + 3])) continue;
+
+                    // ao menos uma nota interna dissonante
+                    const dissCount = [nb, nc].filter((n, i) =>
+                        !consComCantus(n, cfAll[start + 1 + i])
+                    ).length;
+                    if (dissCount === 0) continue;
+
+                    const nucleo = [na, nb, nc, nd];
+
+                    if (start === 0) {
+                        // núcleo em [n1..n4], n5 é nota livre (semibreve, cf2)
+                        for (const n5 of shuffled2) {
+                            if (!consComCantus(n5, cf2)) continue;
+                            if (!isLeapPermitido(nd, n5)) continue;
+                            const seq = [...nucleo, n5];
+                            if (validarSequencia(seq, [4])) return seqStd(seq);
+                        }
+                    } else {
+                        // núcleo em [n2..n5], n1 é nota livre (semínima, cf1)
+                        for (const n1 of shuffled1) {
+                            if (!consComCantus(n1, cf1)) continue;
+                            if (!isLeapPermitido(n1, na, nb)) continue;
+                            const seq = [n1, ...nucleo];
+                            if (validarSequencia(seq, [0])) return seqStd(seq);
+                        }
+                    }
                 }
             }
         }
+        return null;
     }
 
     // ── NOTA DE PASSAGEM ACENTUADA ──
-    if (tratamento === 'F - Nota de passagem acentuada') {
+    if (tratamento === 'Nota de passagem acentuada') {
         for (const poss of embaralhar(['a','b'])) {
             if (poss === 'a') {
                 // cons(extra) → cons(prep) → diss(NP) → cons(res) | cons(extra)
@@ -1015,7 +1069,7 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     }
 
     // ── BORDADURA ACENTUADA ──
-    if (tratamento === 'G - Bordadura acentuada') {
+    if (tratamento === 'Bordadura acentuada') {
         for (const poss of embaralhar(['a','b'])) {
             if (poss === 'a') {
                 // cons(extra) → cons(prep) → diss(B) → cons(res=prep) | cons(extra)
@@ -1074,32 +1128,54 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
 }
 
 // ==================== 3ª ESPÉCIE — ANÁLISE ====================
-function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado) {
-    if (!userCP || userCP.length < 5) return { ok: false, erro: 'Número de notas insuficiente (esperado: pelo menos 5)' };
+function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo) {
+    if (!userCP || userCP.length < 4) return { ok: false, erro: 'Número de notas insuficiente' };
     const cf1 = cantus[0].note;
     const cf2 = cantus[1].note;
 
-    const isPausaFmt = userCP.length === 6 && userCP[0].duration === 'hr';
+    // ── Detectar formato pelo ritmoModelo e validar durações ──
+    const d = userCP.map(n => n.duration);
+    let fmt; // 'a' | 'b' | 'c' | 'd'
 
-    if (isPausaFmt) {
-        const d = userCP.map(n => n.duration);
-        if (!(d[0]==='hr'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='q'&&d[5]==='h'))
-            return { ok: false, erro: 'Durações incorretas para formato com pausa (esperado: 𝄼 ♩ ♩ | ♩ ♩ ♩)' };
-    } else if (userCP.length === 5) {
-        const d = userCP.map(n => n.duration);
-        if (!(d[0]==='q'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='w'))
-            return { ok: false, erro: 'Durações incorretas (esperado: ♩ ♩ ♩ ♩ | 𝅜)' };
+    // Identifica o formato pelo conteúdo real do contraponto inserido pelo aluno
+    if (d[0]==='q' && d[1]==='q' && d[2]==='q' && d[3]==='q' && d[4]==='w' && userCP.length===5) {
+        fmt = 'a';
+    } else if (d[0]==='hr' && d[1]==='q' && d[2]==='q' && d[3]==='q' && d[4]==='q' && d[5]==='h' && userCP.length===6) {
+        fmt = 'b';
+    } else if (d[0]==='qr' && d[1]==='q' && d[2]==='q' && d[3]==='q' && d[4]==='w' && userCP.length===5) {
+        fmt = 'c';
+    } else if (d[0]==='qr' && d[1]==='q' && d[2]==='q' && d[3]==='q' && d[4]==='q' && d[5]==='q' && d[6]==='h' && userCP.length===7) {
+        fmt = 'd';
     } else {
-        return { ok: false, erro: `Número de notas incorreto (esperado: 5 ou 6, encontrado: ${userCP.length})` };
+        // Mensagem de erro orientada pelo ritmoModelo esperado
+        const esperado = RITMO_DISPLAY[ritmoModelo] || '♩ ♩ ♩ ♩ | 𝅜';
+        return { ok: false, erro: `Durações incorretas. Esperado: ${esperado}` };
     }
 
+    // Verifica se o formato inserido corresponde ao modelo sorteado
+    if (fmt !== ritmoModelo) {
+        const esperado = RITMO_DISPLAY[ritmoModelo] || '♩ ♩ ♩ ♩ | 𝅜';
+        return { ok: false, erro: `Formato incorreto. Use o modelo sorteado: ${esperado}` };
+    }
+
+    // ── Montar notas e cfNotas por formato ──
     let notas, cfNotas;
-    if (isPausaFmt) {
-        notas   = [null, userCP[1].note, userCP[2].note, userCP[3].note, userCP[4].note, userCP[5].note];
-        cfNotas = [cf1,  cf1,            cf1,            cf2,            cf2,            cf2];
-    } else {
+    if (fmt === 'a') {
+        // [q q q q | w]  → 5 elementos
         notas   = userCP.map(n => n.note);
         cfNotas = [cf1, cf1, cf1, cf1, cf2];
+    } else if (fmt === 'b') {
+        // [hr q q | q q h]  → 6 elementos; pausa no slot 0
+        notas   = [null, userCP[1].note, userCP[2].note, userCP[3].note, userCP[4].note, userCP[5].note];
+        cfNotas = [cf1,  cf1,            cf1,            cf2,            cf2,            cf2];
+    } else if (fmt === 'c') {
+        // [qr q q q | w]  → 5 elementos; pausa no slot 0
+        notas   = [null, userCP[1].note, userCP[2].note, userCP[3].note, userCP[4].note];
+        cfNotas = [cf1,  cf1,            cf1,            cf1,            cf2];
+    } else { // fmt === 'd'
+        // [qr q q q | q q h]  → 7 elementos; pausa no slot 0
+        notas   = [null, userCP[1].note, userCP[2].note, userCP[3].note, userCP[4].note, userCP[5].note, userCP[6].note];
+        cfNotas = [cf1,  cf1,            cf1,            cf1,            cf2,            cf2,            cf2];
     }
 
     const cons  = (n, cf) => isConsonant(noteToNumber(n) - noteToNumber(cf));
@@ -1108,7 +1184,7 @@ function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado) {
     if (!firstReal) return { ok: false, erro: 'Nenhuma nota encontrada' };
     const cpAbaixo = noteToNumber(firstReal) < noteToNumber(cf1);
 
-    // General checks: scale, crossing, parallels
+    // ── Verificações gerais: escala, cruzamento, paralelas ──
     for (let i = 0; i < notas.length; i++) {
         if (notas[i] === null) continue;
         if (!currentScale.includes(notas[i].split('/')[0]))
@@ -1124,44 +1200,87 @@ function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado) {
             return { ok: false, erro: `Ocultas proibidas entre as posições ${i+1} e ${i+2}` };
     }
 
-    // At least one dissonance
-    let hasDiss = notas.some((n,i) => n !== null && diss(n, cfNotas[i]));
+    // ── Ao menos uma dissonância ──
+    const hasDiss = notas.some((n,i) => n !== null && diss(n, cfNotas[i]));
     if (!hasDiss) return { ok: false, erro: 'Nenhuma dissonância encontrada — inclua pelo menos uma' };
 
-    // ── Treatment-specific checks ──
-    if (!isPausaFmt) {
-        const [n1,n2,n3,n4,n5] = notas;
+    // ── Despacho por tratamento e formato ──
 
-        if (tratamentoEsperado === 'A - Nota de passagem') {
-            return analisarNP3(notas, cfNotas);
-        }
-        if (tratamentoEsperado === 'B - Bordadura') {
-            return analisarBordadura3(notas, cfNotas);
-        }
-        if (tratamentoEsperado === 'C - Cambiata') {
-            return analisarCambiata3(notas, cfNotas);
-        }
-        if (tratamentoEsperado === 'D - Bordadura dupla') {
-            return analisarBordaduraDupla3(notas, cfNotas);
-        }
-        if (tratamentoEsperado === 'E - Grupo de notas de passagem') {
-            return analisarGrupoNP3(notas, cfNotas);
-        }
-        if (tratamentoEsperado === 'F - Nota de passagem acentuada') {
-            return analisarNPAcentuadaStd(notas, cfNotas);
-        }
-        if (tratamentoEsperado === 'G - Bordadura acentuada') {
-            return analisarBordaduraAcentuadaStd(notas, cfNotas);
-        }
-    } else {
-        const [, n2, n3, n4, n5, n6] = notas;
-        if (tratamentoEsperado === 'F - Nota de passagem acentuada') {
-            return analisarNPAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo);
-        }
-        if (tratamentoEsperado === 'G - Bordadura acentuada') {
-            return analisarBordaduraAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo);
-        }
+    // Formato a: [q q q q | w] — lógica original
+    if (fmt === 'a') {
+        if (tratamentoEsperado === 'Nota de passagem')           return analisarNP3(notas, cfNotas);
+        if (tratamentoEsperado === 'Bordadura')                  return analisarBordadura3(notas, cfNotas);
+        if (tratamentoEsperado === 'Cambiata')                   return analisarCambiata3(notas, cfNotas);
+        if (tratamentoEsperado === 'Bordadura dupla')            return analisarBordaduraDupla3(notas, cfNotas);
+        if (tratamentoEsperado === 'Grupo de notas de passagem') return analisarGrupoNP3(notas, cfNotas);
+        if (tratamentoEsperado === 'Nota de passagem acentuada') return analisarNPAcentuadaStd(notas, cfNotas);
+        if (tratamentoEsperado === 'Bordadura acentuada')        return analisarBordaduraAcentuadaStd(notas, cfNotas);
     }
+
+    // Formato b: [hr q q | q q h] — pausa de mínima
+    // notas = [null, n2, n3, n4, n5, n6]  cfNotas = [cf1, cf1, cf1, cf2, cf2, cf2]
+    if (fmt === 'b') {
+        const [, n2, n3, n4, n5, n6] = notas;
+        const cf = cfNotas;
+        if (tratamentoEsperado === 'Nota de passagem acentuada')
+            return analisarNPAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo);
+        if (tratamentoEsperado === 'Bordadura acentuada')
+            return analisarBordaduraAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo);
+        // A, B, D, E, C (cambiata inicia em n2, posição t3 do c1)
+        const notasB  = [n2, n3, n4, n5, n6];
+        const cfNotasB = [cf1, cf1, cf2, cf2, cf2];
+        if (tratamentoEsperado === 'Nota de passagem')           return analisarNP3(notasB, cfNotasB);
+        if (tratamentoEsperado === 'Bordadura')                  return analisarBordadura3(notasB, cfNotasB);
+        if (tratamentoEsperado === 'Cambiata')                   return analisarCambiata3(notasB, cfNotasB);
+        if (tratamentoEsperado === 'Bordadura dupla')            return analisarBordaduraDupla3(notasB, cfNotasB);
+        if (tratamentoEsperado === 'Grupo de notas de passagem') return analisarGrupoNP3(notasB, cfNotasB);
+    }
+
+    // Formato c: [qr q q q | w] — pausa de semínima
+    // notas = [null, n2, n3, n4, n5]  cfNotas = [cf1, cf1, cf1, cf1, cf2]
+    if (fmt === 'c') {
+        const [, n2, n3, n4, n5] = notas;
+        const notasC  = [n2, n3, n4, n5];
+        const cfNotasC = [cf1, cf1, cf1, cf2];
+        // n2 é consonância livre (t2 do c1); padrão inicia em n2
+        if (tratamentoEsperado === 'Nota de passagem')           return analisarNP3(notasC, cfNotasC);
+        if (tratamentoEsperado === 'Bordadura')                  return analisarBordadura3(notasC, cfNotasC);
+        if (tratamentoEsperado === 'Bordadura dupla')            return analisarBordaduraDupla3(notasC, cfNotasC);
+        if (tratamentoEsperado === 'Grupo de notas de passagem') return analisarGrupoNP3(notasC, cfNotasC);
+        // F e G: dissonância pode cair em n3 (t3 do c1)
+        if (tratamentoEsperado === 'Nota de passagem acentuada')
+            return analisarNPAcentuadaFmtC(n2, n3, n4, n5, cf1, cf2, cpAbaixo);
+        if (tratamentoEsperado === 'Bordadura acentuada')
+            return analisarBordaduraAcentuadaFmtC(n2, n3, n4, n5, cf1, cf2, cpAbaixo);
+    }
+
+    // Formato d: [qr q q q | q q h] — pausa de semínima, 6 notas reais
+    // notas = [null, n2, n3, n4, n5, n6, n7]  cfNotas = [cf1, cf1, cf1, cf1, cf2, cf2, cf2]
+    if (fmt === 'd') {
+        const [, n2, n3, n4, n5, n6, n7] = notas;
+        const cf = cfNotas;
+        // Cambiata: n2 é consonância livre; padrão n3→n7
+        if (tratamentoEsperado === 'Cambiata') {
+            const consN2 = cons(n2, cf1);
+            if (!consN2) return { ok: false, erro: 'Cambiata (fmt d): n2 deve ser consonante (nota livre)' };
+            const notasCamb  = [n3, n4, n5, n6, n7];
+            const cfCamb = [cf1, cf1, cf2, cf2, cf2];
+            return analisarCambiata3(notasCamb, cfCamb);
+        }
+        // F e G: dissonância em t3 do c1 (n3) e/ou t1 do c2 (n5)
+        if (tratamentoEsperado === 'Nota de passagem acentuada')
+            return analisarNPAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbaixo);
+        if (tratamentoEsperado === 'Bordadura acentuada')
+            return analisarBordaduraAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbaixo);
+        // A, B, D, E: n2 consonância livre; padrão sobre n2..n7
+        const notasD  = [n2, n3, n4, n5, n6, n7];
+        const cfNotasD = [cf1, cf1, cf1, cf2, cf2, cf2];
+        if (tratamentoEsperado === 'Nota de passagem')           return analisarNP3(notasD, cfNotasD);
+        if (tratamentoEsperado === 'Bordadura')                  return analisarBordadura3(notasD, cfNotasD);
+        if (tratamentoEsperado === 'Bordadura dupla')            return analisarBordaduraDupla3(notasD, cfNotasD);
+        if (tratamentoEsperado === 'Grupo de notas de passagem') return analisarGrupoNP3(notasD, cfNotasD);
+    }
+
     return { ok: true };
 }
 
@@ -1230,8 +1349,8 @@ function analisarBordadura3(notas, cfNotas) {
         if (!cons(res,  cfNotas[i+1])) return { ok: false, erro: `Resolução da bordadura (posição ${i+2}): deve ser consonante com o CF` };
     }
     for (let i = 0; i < notas.length - 1; i++) {
-        if (!isLeapPermitido(notas[i], notas[i+1], notas[i+2]) && isConsonant(noteToNumber(notas[i])-noteToNumber(cfNotas[i])) && isConsonant(noteToNumber(notas[i+1])-noteToNumber(cfNotas[i+1])))
-            return { ok: false, erro: `Salto entre posições ${i+1} e ${i+2} excede uma 5ª (saltos maiores do que a 5ª devem ser compensados)` };
+        if (!isLeapPermitido(notas[i], notas[i+1], notas[i+2] ?? null) && isConsonant(noteToNumber(notas[i])-noteToNumber(cfNotas[i])) && isConsonant(noteToNumber(notas[i+1])-noteToNumber(cfNotas[i+1])))
+            return { ok: false, erro: `Salto entre posições ${i+1} e ${i+2} excede uma 5ª sem compensação por movimento contrário` };
     }
     return { ok: true };
 }
@@ -1271,38 +1390,95 @@ function analisarCambiata3(notas, cfNotas) {
 
 // ── Bordadura dupla ──
 function analisarBordaduraDupla3(notas, cfNotas) {
-    const [n1,n2,n3,n4,n5] = notas;
-    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
-    if (!cons(n1, cfNotas[0])) return { ok: false, erro: 'Bordadura dupla: n1 deve ser consonante com o CF' };
-    if (!cons(n4, cfNotas[3])) return { ok: false, erro: 'Bordadura dupla: n4 deve ser consonante com o CF (retorno à nota de preparação)' };
-    if (noteToNumber(n1) !== noteToNumber(n4)) return { ok: false, erro: 'Bordadura dupla: n4 deve retornar à mesma nota de n1' };
-    if (!isStep(n1, n2)) return { ok: false, erro: 'Bordadura dupla: movimento n1→n2 deve ser por grau (2ª)' };
-    if (!isStep(n1, n3)) return { ok: false, erro: 'Bordadura dupla: movimento n1→n3 deve ser por grau (2ª)' };
-    const d1 = Math.sign(noteToNumber(n2)-noteToNumber(n1));
-    const d2 = Math.sign(noteToNumber(n3)-noteToNumber(n1));
-    if (d1 === d2) return { ok: false, erro: 'Bordadura dupla: n2 e n3 devem ser bordaduras de lados opostos (superior e inferior)' };
-    if (!cons(n5, cfNotas[4])) return { ok: false, erro: 'Bordadura dupla: semibreve final deve ser consonante com o CF' };
-    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'Bordadura dupla: movimento n4→n5 excede uma 5ª' };
-    return { ok: true };
+    const cons = (n, cf) => isConsonant(noteToNumber(n) - noteToNumber(cf));
+
+    let melhorErro = 'Bordadura dupla: nenhuma posição válida para o tratamento encontrada\n';
+
+    for (let start = 0; start <= notas.length - 4; start++) {
+        const [na, nb, nc, nd] = notas.slice(start, start + 4);
+        const [cfa, cfb, cfc, cfd] = cfNotas.slice(start, start + 4);
+
+        // Validar tratamento: prep → bord1 → bord2 → retorno
+        if (!cons(na, cfa)) { melhorErro += `se n1 = ${na}: nota de início do tratamento deve ser consonante com o CF\n`; continue; }
+        if (!cons(nd, cfd)) { melhorErro += `se n1 = ${na}: nota de chegada do tratamento deve ser consonante com o CF\n`; continue; }
+        if (noteToNumber(na) !== noteToNumber(nd)) { melhorErro += `se n1 = ${na}: nota de chegada do tratamento deve retornar à mesma nota inicial\n`; continue; }
+        if (!isStep(na, nb)) { melhorErro += `se n1 = ${na}: movimento prep→bord1 deve ser por grau conjunto (2ª)\n`; continue; }
+        if (!isStep(na, nc)) { melhorErro += `se n1 = ${na}: movimento prep→bord2 deve ser por grau conjunto (2ª)\n`; continue; }
+        const d1 = Math.sign(noteToNumber(nb) - noteToNumber(na));
+        const d2 = Math.sign(noteToNumber(nc) - noteToNumber(na));
+        if (d1 === d2) { melhorErro += `se n1 = ${na}: bord1 e bord2 devem estar em lados opostos (superior e inferior)\n`; continue; }
+
+        // Validar notas livres (fora do tratamento)
+        let erroLivre = null;
+        for (let i = 0; i < notas.length; i++) {
+            if (i >= start && i <= start + 3) continue;
+            if (!cons(notas[i], cfNotas[i])) {
+                erroLivre = `se n1 = ${na}: Posição ${i + 1} (nota livre) deve ser consonante com o CF\n`; break;
+            }
+        }
+        if (erroLivre) { melhorErro += erroLivre; continue; }
+
+        // Validar saltos entre todas as posições consecutivas
+        let erroSalto = null;
+        for (let i = 0; i < notas.length - 1; i++) {
+            if (!isLeapPermitido(notas[i], notas[i + 1], notas[i + 2] ?? null)) {
+                erroSalto = `se n1 = ${na}: Salto entre posições ${i + 1} e ${i + 2} excede uma 5ª sem compensação\n`; break;
+            }
+        }
+        if (erroSalto) { melhorErro += erroSalto; continue; }
+
+        return { ok: true };
+    }
+
+    return { ok: false, erro: melhorErro };
 }
 
 // ── Grupo de notas de passagem ──
 function analisarGrupoNP3(notas, cfNotas) {
-    const [n1,n2,n3,n4,n5] = notas;
-    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
-    if (!cons(n1, cfNotas[0])) return { ok: false, erro: 'Grupo de NP: n1 deve ser consonante com o CF' };
-    if (!cons(n4, cfNotas[3])) return { ok: false, erro: 'Grupo de NP: n4 deve ser consonante com o CF' };
-    if (!isStep(n1,n2)) return { ok: false, erro: 'Grupo de NP: n1→n2 deve ser por grau (2ª)' };
-    if (!isStep(n2,n3)) return { ok: false, erro: 'Grupo de NP: n2→n3 deve ser por grau (2ª)' };
-    if (!isStep(n3,n4)) return { ok: false, erro: 'Grupo de NP: n3→n4 deve ser por grau (2ª)' };
-    const d12 = Math.sign(noteToNumber(n2)-noteToNumber(n1));
-    const d23 = Math.sign(noteToNumber(n3)-noteToNumber(n2));
-    const d34 = Math.sign(noteToNumber(n4)-noteToNumber(n3));
-    if (!(d12===d23&&d23===d34)) return { ok: false, erro: 'Grupo de NP: o movimento deve ser na mesma direção do início ao fim (n1→n2→n3→n4)' };
-    const dissCount = [n2,n3].filter((n,i) => !cons(n, cfNotas[i+1])).length;
-    if (dissCount === 0) return { ok: false, erro: 'Grupo de NP: ao menos uma nota interna (n2 ou n3) deve ser dissonante' };
-    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'Grupo de NP: movimento n4→n5 (para a semibreve) deve ser menor que uma 5ª' };
-    return { ok: true };
+    const cons = (n, cf) => isConsonant(noteToNumber(n) - noteToNumber(cf));
+
+    let melhorErro = 'Grupo de NP: nenhuma posição válida para o tratamento encontrada\n';
+
+    for (let start = 0; start <= notas.length - 4; start++) {
+        const [na, nb, nc, nd] = notas.slice(start, start + 4);
+        const [cfa, cfb, cfc, cfd] = cfNotas.slice(start, start + 4);
+
+        // Validar tratamento: cons → step → step → step → cons, mesma direção
+        if (!cons(na, cfa)) { melhorErro += `se n1 = ${na}: nota de início do tratamento deve ser consonante com o CF\n`; continue; }
+        if (!cons(nd, cfd)) { melhorErro += `se n1 = ${na}: nota de chegada do tratamento deve ser consonante com o CF`; continue; }
+        if (!isStep(na, nb)) { melhorErro = `se n1 = ${na}: movimento na→nb deve ser por grau conjunto (2ª)\n`; continue; }
+        if (!isStep(nb, nc)) { melhorErro = `se n1 = ${na}: movimento nb→nc deve ser por grau conjunto (2ª)\n`; continue; }
+        if (!isStep(nc, nd)) { melhorErro = `se n1 = ${na}: movimento nc→nd deve ser por grau conjunto (2ª)\n`; continue; }
+        const dab = Math.sign(noteToNumber(nb) - noteToNumber(na));
+        const dbc = Math.sign(noteToNumber(nc) - noteToNumber(nb));
+        const dcd = Math.sign(noteToNumber(nd) - noteToNumber(nc));
+        if (!(dab === dbc && dbc === dcd)) { melhorErro = `se n1 = ${na}: o movimento deve ser na mesma direção do início ao fim\n`; continue; }
+        const dissCount = [nb, nc].filter((n, i) => !cons(n, [cfb, cfc][i])).length;
+        if (dissCount === 0) { melhorErro = `se n1 = ${na}: ao menos uma nota interna (nb ou nc) deve ser dissonante com o CF\n`; continue; }
+
+        // Validar notas livres (fora do tratamento)
+        let erroLivre = null;
+        for (let i = 0; i < notas.length; i++) {
+            if (i >= start && i <= start + 3) continue;
+            if (!cons(notas[i], cfNotas[i])) {
+                erroLivre = `se n1 = ${na}Posição ${i + 1} (nota livre) deve ser consonante com o CF\n`; break;
+            }
+        }
+        if (erroLivre) { melhorErro += erroLivre; continue; }
+
+        // Validar saltos entre todas as posições consecutivas
+        let erroSalto = null;
+        for (let i = 0; i < notas.length - 1; i++) {
+            if (!isLeapPermitido(notas[i], notas[i + 1], notas[i + 2] ?? null)) {
+                erroSalto = `se n1 = ${na}Salto entre posições ${i + 1} e ${i + 2} excede uma 5ª sem compensação\n`; break;
+            }
+        }
+        if (erroSalto) { melhorErro += erroSalto; continue; }
+
+        return { ok: true };
+    }
+
+    return { ok: false, erro: melhorErro };
 }
 
 // ── NP Acentuada — formato padrão ──
@@ -1321,8 +1497,8 @@ function analisarNPAcentuadaStd(notas, cfNotas) {
     const dir1 = Math.sign(noteToNumber(n3)-noteToNumber(n2));
     const dir2 = Math.sign(noteToNumber(n4)-noteToNumber(n3));
     if (dir1 !== dir2) return { ok: false, erro: 'NP acentuada: prep→NP→res deve manter a mesma direção' };
-    if (!isLeapPermitido(n1, n2, n3)) return { ok: false, erro: 'NP acentuada: salto entre posições 1 e 2 deve ser menor que uma 5ª (saltos maiores do que a 5ª devem ser compensados)' };
-    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'NP acentuada: salto entre posição 4 e a semibreve deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n1, n2, n3)) return { ok: false, erro: 'NP acentuada: salto entre posições 1 e 2 excede uma 5ª sem compensação' };
+    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'NP acentuada: salto entre posição 4 e a semibreve excede uma 5ª (não compensável)' };
     return { ok: true };
 }
 
@@ -1338,8 +1514,8 @@ function analisarBordaduraAcentuadaStd(notas, cfNotas) {
     if (!isStep(n2, n3)) return { ok: false, erro: 'Bordadura acentuada: movimento prep→B (posições 2→3) deve ser por grau (2ª)' };
     if (!isStep(n3, n4)) return { ok: false, erro: 'Bordadura acentuada: movimento B→res (posições 3→4) deve ser por grau (2ª)' };
     if (noteToNumber(n2) !== noteToNumber(n4)) return { ok: false, erro: 'Bordadura acentuada: resolução (posição 4) deve retornar à nota de preparação (posição 2)' };
-    if (!isLeapPermitido(n1, n2, n3)) return { ok: false, erro: 'Bordadura acentuada: salto entre posições 1 e 2 deve ser menor que uma 5ª (saltos maiores do que a 5ª devem ser compensados)' };
-    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'Bordadura acentuada: salto entre posição 4 e a semibreve deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n1, n2, n3)) return { ok: false, erro: 'Bordadura acentuada: salto entre posições 1 e 2 excede uma 5ª sem compensação' };
+    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'Bordadura acentuada: salto entre posição 4 e a semibreve excede uma 5ª (não compensável)' };
     return { ok: true };
 }
 
@@ -1356,8 +1532,8 @@ function analisarNPAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo) {
     const dir1 = Math.sign(noteToNumber(n4)-noteToNumber(n3));
     const dir2 = Math.sign(noteToNumber(n5)-noteToNumber(n4));
     if (dir1 !== dir2) return { ok: false, erro: 'NP acentuada (pausa): prep→NP→res deve manter a mesma direção' };
-    if (!isLeapPermitido(n2, n3, n4)) return { ok: false, erro: 'NP acentuada (pausa): salto entre posições 2 e 3 deve ser menor que uma 5ª (saltos maiores do que a 5ª devem ser compensados)' };
-    if (!isLeapPermitido(n5, n6, null)) return { ok: false, erro: 'NP acentuada (pausa): salto entre posições 5 e 6 deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n2, n3, n4)) return { ok: false, erro: 'NP acentuada (pausa): salto entre posições 2 e 3 excede uma 5ª sem compensação' };
+    if (!isLeapPermitido(n5, n6, null)) return { ok: false, erro: 'NP acentuada (pausa): salto entre posições 5 e 6 excede uma 5ª (não compensável)' };
     return { ok: true };
 }
 
@@ -1372,8 +1548,104 @@ function analisarBordaduraAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo)
     if (!isStep(n3, n4)) return { ok: false, erro: 'Bordadura acentuada (pausa): movimento prep→B (posições 3→4) deve ser por grau (2ª)' };
     if (!isStep(n4, n5)) return { ok: false, erro: 'Bordadura acentuada (pausa): movimento B→res (posições 4→5) deve ser por grau (2ª)' };
     if (noteToNumber(n3) !== noteToNumber(n5)) return { ok: false, erro: 'Bordadura acentuada (pausa): resolução (posição 5) deve retornar à nota de preparação (posição 3)' };
-    if (!isLeapPermitido(n2, n3, n4)) return { ok: false, erro: 'Bordadura acentuada (pausa): salto entre posições 2 e 3 deve ser menor que uma 5ª (saltos maiores do que a 5ª devem ser compensados)' };
-    if (!isLeapPermitido(n5, n6, null)) return { ok: false, erro: 'Bordadura acentuada (pausa): salto entre posições 5 e 6 deve ser menor que uma 5ª' };
+    if (!isLeapPermitido(n2, n3, n4)) return { ok: false, erro: 'Bordadura acentuada (pausa): salto entre posições 2 e 3 excede uma 5ª sem compensação' };
+    if (!isLeapPermitido(n5, n6, null)) return { ok: false, erro: 'Bordadura acentuada (pausa): salto entre posições 5 e 6 excede uma 5ª (não compensável)' };
+    return { ok: true };
+}
+
+// ── NP Acentuada — formato c: [qr q q q | w] ──
+// notas reais: n2(t2,cf1) n3(t3,cf1) n4(t4,cf1) n5(t1c2,cf2)
+// Dissonância acentuada em t3 (n3)
+function analisarNPAcentuadaFmtC(n2, n3, n4, n5, cf1, cf2, cpAbaixo) {
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    if (!cons(n2, cf1)) return { ok: false, erro: 'NP acentuada (fmt c): n2 deve ser consonante com o CF' };
+    if (cons(n3, cf1))  return { ok: false, erro: 'NP acentuada (fmt c): n3 (t3) deve ser dissonante com o CF' };
+    if (!cons(n4, cf1)) return { ok: false, erro: 'NP acentuada (fmt c): n4 deve ser consonante com o CF' };
+    if (!cons(n5, cf2)) return { ok: false, erro: 'NP acentuada (fmt c): semibreve final deve ser consonante com o CF' };
+    if (!isStep(n2, n3)) return { ok: false, erro: 'NP acentuada (fmt c): prep→NP (n2→n3) deve ser por grau' };
+    if (!isStep(n3, n4)) return { ok: false, erro: 'NP acentuada (fmt c): NP→res (n3→n4) deve ser por grau' };
+    const dir1 = Math.sign(noteToNumber(n3)-noteToNumber(n2));
+    const dir2 = Math.sign(noteToNumber(n4)-noteToNumber(n3));
+    if (dir1 !== dir2) return { ok: false, erro: 'NP acentuada (fmt c): prep→NP→res deve manter a mesma direção' };
+    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'NP acentuada (fmt c): salto n4→semibreve excede uma 5ª' };
+    return { ok: true };
+}
+
+// ── Bordadura Acentuada — formato c: [qr q q q | w] ──
+function analisarBordaduraAcentuadaFmtC(n2, n3, n4, n5, cf1, cf2, cpAbaixo) {
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    if (!cons(n2, cf1)) return { ok: false, erro: 'Bordadura acentuada (fmt c): n2 deve ser consonante com o CF' };
+    if (cons(n3, cf1))  return { ok: false, erro: 'Bordadura acentuada (fmt c): n3 (t3) deve ser dissonante com o CF' };
+    if (!cons(n4, cf1)) return { ok: false, erro: 'Bordadura acentuada (fmt c): n4 deve ser consonante com o CF' };
+    if (!cons(n5, cf2)) return { ok: false, erro: 'Bordadura acentuada (fmt c): semibreve final deve ser consonante com o CF' };
+    if (!isStep(n2, n3)) return { ok: false, erro: 'Bordadura acentuada (fmt c): prep→B (n2→n3) deve ser por grau' };
+    if (!isStep(n3, n4)) return { ok: false, erro: 'Bordadura acentuada (fmt c): B→res (n3→n4) deve ser por grau' };
+    if (noteToNumber(n2) !== noteToNumber(n4)) return { ok: false, erro: 'Bordadura acentuada (fmt c): resolução (n4) deve retornar à nota de preparação (n2)' };
+    if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'Bordadura acentuada (fmt c): salto n4→semibreve excede uma 5ª' };
+    return { ok: true };
+}
+
+// ── NP Acentuada — formato d: [qr q q q | q q h] ──
+// notas reais: n2(t2,cf1) n3(t3,cf1) n4(t4,cf1) n5(t1c2,cf2) n6(t2c2,cf2) n7(t3-4c2,cf2)
+// Dissonância pode ocorrer em n3 (t3 do c1) e/ou n5 (t1 do c2)
+function analisarNPAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbaixo) {
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    const diss = (n,cf) => !cons(n,cf);
+    let found = false;
+
+    // Verifica NP em n3 (t3, cf1), preparação=n2, resolução=n4
+    if (diss(n3, cf1)) {
+        if (!cons(n2, cf1)) return { ok: false, erro: 'NP acentuada (fmt d): preparação n2 deve ser consonante' };
+        if (!isStep(n2, n3)) return { ok: false, erro: 'NP acentuada (fmt d): prep→NP (n2→n3) deve ser por grau' };
+        if (!isStep(n3, n4)) return { ok: false, erro: 'NP acentuada (fmt d): NP→res (n3→n4) deve ser por grau' };
+        if (Math.sign(noteToNumber(n3)-noteToNumber(n2)) !== Math.sign(noteToNumber(n4)-noteToNumber(n3)))
+            return { ok: false, erro: 'NP acentuada (fmt d): prep→NP→res deve manter a mesma direção' };
+        if (!cons(n4, cf1)) return { ok: false, erro: 'NP acentuada (fmt d): resolução n4 deve ser consonante' };
+        found = true;
+    }
+    // Verifica NP em n5 (t1 do c2, cf2), preparação=n4, resolução=n6
+    if (diss(n5, cf2)) {
+        if (!cons(n4, cf1)) return { ok: false, erro: 'NP acentuada (fmt d): preparação n4 deve ser consonante' };
+        if (!isStep(n4, n5)) return { ok: false, erro: 'NP acentuada (fmt d): prep→NP (n4→n5) deve ser por grau' };
+        if (!isStep(n5, n6)) return { ok: false, erro: 'NP acentuada (fmt d): NP→res (n5→n6) deve ser por grau' };
+        if (Math.sign(noteToNumber(n5)-noteToNumber(n4)) !== Math.sign(noteToNumber(n6)-noteToNumber(n5)))
+            return { ok: false, erro: 'NP acentuada (fmt d): prep→NP→res deve manter a mesma direção' };
+        if (!cons(n6, cf2)) return { ok: false, erro: 'NP acentuada (fmt d): resolução n6 deve ser consonante' };
+        found = true;
+    }
+    if (!found) return { ok: false, erro: 'NP acentuada (fmt d): nenhuma NP acentuada válida encontrada em t3 do c1 ou t1 do c2' };
+    if (!cons(n2, cf1)) return { ok: false, erro: 'NP acentuada (fmt d): n2 deve ser consonante (tempo 2)' };
+    if (!cons(n7, cf2)) return { ok: false, erro: 'NP acentuada (fmt d): mínima final (n7) deve ser consonante' };
+    return { ok: true };
+}
+
+// ── Bordadura Acentuada — formato d: [qr q q q | q q h] ──
+function analisarBordaduraAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbaixo) {
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    const diss = (n,cf) => !cons(n,cf);
+    let found = false;
+
+    // Verifica Bordadura em n3 (t3, cf1), preparação=n2, resolução=n4
+    if (diss(n3, cf1)) {
+        if (!cons(n2, cf1)) return { ok: false, erro: 'Bordadura acentuada (fmt d): preparação n2 deve ser consonante' };
+        if (!isStep(n2, n3)) return { ok: false, erro: 'Bordadura acentuada (fmt d): prep→B (n2→n3) deve ser por grau' };
+        if (!isStep(n3, n4)) return { ok: false, erro: 'Bordadura acentuada (fmt d): B→res (n3→n4) deve ser por grau' };
+        if (noteToNumber(n2) !== noteToNumber(n4)) return { ok: false, erro: 'Bordadura acentuada (fmt d): resolução n4 deve retornar à nota de preparação n2' };
+        if (!cons(n4, cf1)) return { ok: false, erro: 'Bordadura acentuada (fmt d): resolução n4 deve ser consonante' };
+        found = true;
+    }
+    // Verifica Bordadura em n5 (t1 do c2, cf2), preparação=n4, resolução=n6
+    if (diss(n5, cf2)) {
+        if (!cons(n4, cf1)) return { ok: false, erro: 'Bordadura acentuada (fmt d): preparação n4 deve ser consonante' };
+        if (!isStep(n4, n5)) return { ok: false, erro: 'Bordadura acentuada (fmt d): prep→B (n4→n5) deve ser por grau' };
+        if (!isStep(n5, n6)) return { ok: false, erro: 'Bordadura acentuada (fmt d): B→res (n5→n6) deve ser por grau' };
+        if (noteToNumber(n4) !== noteToNumber(n6)) return { ok: false, erro: 'Bordadura acentuada (fmt d): resolução n6 deve retornar à nota de preparação n4' };
+        if (!cons(n6, cf2)) return { ok: false, erro: 'Bordadura acentuada (fmt d): resolução n6 deve ser consonante' };
+        found = true;
+    }
+    if (!found) return { ok: false, erro: 'Bordadura acentuada (fmt d): nenhuma bordadura acentuada válida encontrada em t3 do c1 ou t1 do c2' };
+    if (!cons(n2, cf1)) return { ok: false, erro: 'Bordadura acentuada (fmt d): n2 deve ser consonante (tempo 2)' };
+    if (!cons(n7, cf2)) return { ok: false, erro: 'Bordadura acentuada (fmt d): mínima final (n7) deve ser consonante' };
     return { ok: true };
 }
 
@@ -1419,15 +1691,15 @@ function analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado) {
     function isStep(a, b) { return Math.abs(noteToNumber(b) - noteToNumber(a)) === 1 || Math.abs(noteToNumber(b) - noteToNumber(a)) === 2; }
     const dir1 = Math.sign(step1);
     const dir2 = Math.sign(step2);
-    if (tratamentoEsperado === 'A - Nota de passagem') {
+    if (tratamentoEsperado === 'Nota de passagem') {
         if (!(isStep(n1.note, n2.note) && isStep(n2.note, n3.note) && dir1 === dir2)) {
             return { ok: false, erro: 'Movimento não corresponde a nota de passagem' };
         }
-    } else if (tratamentoEsperado === 'B - Bordadura Inferior') {
+    } else if (tratamentoEsperado === 'Bordadura Inferior') {
         if (!(isStep(n1.note, n2.note) && isStep(n2.note, n3.note) && dir1 === -1 && dir2 === 1 && noteToNumber(n1.note) === noteToNumber(n3.note))) {
             return { ok: false, erro: 'Movimento não corresponde a bordadura inferior' };
         }
-    } else if (tratamentoEsperado === 'C - Bordadura Superior') {
+    } else if (tratamentoEsperado === 'Bordadura Superior') {
         if (!(isStep(n1.note, n2.note) && isStep(n2.note, n3.note) && dir1 === 1 && dir2 === -1 && noteToNumber(n1.note) === noteToNumber(n3.note))) {
             return { ok: false, erro: 'Movimento não corresponde a bordadura superior' };
         }
@@ -1444,7 +1716,7 @@ function validarRespostaEscrita(q) {
     if (currentSpecies === 2) {
         resultado = analisarContraponto2aEspecie(userContraponto, q.cantus, q.resposta);
     } else if (currentSpecies === 3) {
-        resultado = analisarContraponto3aEspecie(userContraponto, q.cantus, q.resposta);
+        resultado = analisarContraponto3aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || 'a');
     } else {
         resultado = { ok: false, erro: 'Espécie não implementada para validação escrita' };
     }
@@ -1458,12 +1730,48 @@ function validarRespostaEscrita(q) {
         const percentual = (pontuacao * 100).toFixed(1);
         showFeedback(`✅ Correto! Pontuação: ${pontuacao.toFixed(2)} (${percentual}%) na ${questionAttempts[currentQuestionIndex]}ª tentativa`, true);
         
+        // Se for a última questão, desativa o botão antes de chamar proceedToNext
+        if (currentQuestionIndex === questions.length - 1) {
+            const nb = document.getElementById('next-btn');
+            if (nb) { nb.disabled = true; nb.innerHTML = '✔ Concluído'; }
+        }
         setTimeout(() => proceedToNext(), 1000);
     } else {
-        showFeedback(`❌ ${resultado.erro} - Tentativa ${questionAttempts[currentQuestionIndex]}`, false);
+        showFeedbackPersistente(`❌ ${resultado.erro} \n- Tentativa ${questionAttempts[currentQuestionIndex]}`, false);
         questionAnswered = false;
     }
 }
+
+// ==================== MODELO RÍTMICO ====================
+// Padrões: a=[q,q,q,q][w], b=[hr,q,q][q,q,h], c=[qr,q,q,q][w], d=[qr,q,q,q][q,q,h]
+const RITMO_MODELOS = {
+    'Nota de passagem':        ['a','b','c','d'],
+    'Bordadura':               ['a','b','c','d'],
+    'Cambiata':                ['a','b','d'],
+    'Bordadura dupla':         ['a','b','c','d'],
+    'Grupo de notas de passagem': ['a','b','c','d'],
+    'Nota de passagem acentuada': ['a','b','c','d'],
+    'Bordadura acentuada':     ['a','b','c','d'],
+};
+const RITMO_PESOS = { 'a':4, 'b':3, 'c':2, 'd':1 }; // hierarquia de probabilidade
+
+function sortearRitmoModelo(tratamento) {
+    const modelos = RITMO_MODELOS[tratamento] || ['a'];
+    const totalPeso = modelos.reduce((s, m) => s + RITMO_PESOS[m], 0);
+    let r = Math.random() * totalPeso;
+    for (const m of modelos) {
+        r -= RITMO_PESOS[m];
+        if (r <= 0) return m;
+    }
+    return modelos[modelos.length - 1];
+}
+
+const RITMO_DISPLAY = {
+    'a': '♩ ♩ ♩ ♩ | 𝅜',
+    'b': '𝄼 ♩ ♩ | ♩ ♩ 𝅗𝅥',
+    'c': '𝄽 ♩ ♩ ♩ | 𝅜',
+    'd': '𝄽 ♩ ♩ ♩ | ♩ ♩ 𝅗𝅥',
+};
 
 // ==================== GERAÇÃO DE QUESTÕES ====================
 function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
@@ -1537,7 +1845,7 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
         }
     }
 
-    const tratamentosC = tratamentos.filter(t => t !== 'D - Sem Dissonâncias');
+    const tratamentosC = tratamentos.filter(t => t !== 'Sem Dissonâncias');
     for (let i = 0; i < qtdC; i++) {
         const tratamentoC = tratamentosC[i % tratamentosC.length];
         let parValido = null;
@@ -1555,12 +1863,11 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
         if (!parValido) { console.error(`❌ Não foi possível gerar cantus único para tipo C com tratamento "${tratamentoC}"`); continue; }
 
         let enunciado3;
+        let ritmoModelo3 = 'a';
         if (currentSpecies === 3) {
-            const isPausaTratamento = tratamentoC === 'F - Nota de passagem acentuada' || tratamentoC === 'G - Bordadura acentuada';
-            const ritmoPadrao = '♩ ♩ ♩ ♩ | 𝅜';
-            const ritmoPausa  = '♩ ♩ ♩ ♩ | 𝅜 &nbsp;|&nbsp;ou&nbsp; 𝄼 ♩ ♩ | ♩ ♩ ♩';
-            const ritmoStr = isPausaTratamento ? ritmoPausa : ritmoPadrao;
-            enunciado3 = `Escreva um contraponto de 3ª espécie usando pelo menos uma dissonância tratada como <strong>"${tratamentoC}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; lletter-spacing: 6px;">${ritmoStr}</span>`;
+            ritmoModelo3 = sortearRitmoModelo(tratamentoC);
+            const ritmoStr = RITMO_DISPLAY[ritmoModelo3] || '♩ ♩ ♩ ♩ | 𝅜';
+            enunciado3 = `Escreva um contraponto de 3ª espécie usando pelo menos uma dissonância tratada como <strong>"${tratamentoC}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; letter-spacing: 6px;">${ritmoStr}</span>`;
         } else {
             enunciado3 = `Escreva uma dissonância do tipo <strong>"${tratamentoC}"</strong> no contraponto — use a estrutura rítmica: <strong>mínima mínima semibreve</strong> (use o teclado abaixo):`;
         }
@@ -1572,7 +1879,8 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
             cantus: parValido.cantus,
             cantusPosition: parValido.isUpperVoice ? 'superior' : 'inferior',
             cantusClef: parValido.isUpperVoice ? 'treble' : 'bass',
-            contrapontoEsperado: null
+            contrapontoEsperado: null,
+            ritmoModelo: ritmoModelo3
         });
     }
 
@@ -1616,7 +1924,7 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
     const canvas = document.getElementById('notation-canvas');
     if (!canvas) return;
     try {
-        const duracaoMap = { 'w':4, 'h':2, 'q':1, '8':0.5, 'hr':2 };
+        const duracaoMap = { 'w':4, 'h':2, 'q':1, '8':0.5, 'hr':2, 'qr':1 };
         function distribuirEmCompassos(notas) {
             const compassos = []; let compasso = []; let tempos = 0; const MAX = 4;
             (notas || []).forEach(n => { const dur = duracaoMap[n.duration] || 1;
@@ -1659,14 +1967,14 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
         function criarStaveNotes(notasComp, clef) {
             return notasComp.map(n => {
                 try {
-                    // Pausa de mínima
-                    const restKey = clef === 'bass' ? 'd/3' : 'b/4';
-                    if (n.duration === 'hr' || n.note === null) {
-                        return new Vex.Flow.StaveNote({
-                            keys: [restKey],
-                            duration: 'hr',
-                            clef: clef
-                        });
+                    // Pausas
+                    if (n.duration === 'hr' || (n.note === null && n.duration !== 'qr')) {
+                        const restKey = clef === 'bass' ? 'd/3' : 'b/4';
+                        return new Vex.Flow.StaveNote({ keys: [restKey], duration: 'hr', clef: clef });
+                    }
+                    if (n.duration === 'qr' || n.note === null) {
+                        const restKey = clef === 'bass' ? 'd/3' : 'b/4';
+                        return new Vex.Flow.StaveNote({ keys: [restKey], duration: 'qr', clef: clef });
                     }
                     const stemDir = getStemDirection(n.note, clef);
                     return new Vex.Flow.StaveNote({
@@ -1726,7 +2034,7 @@ function bestClef(notes) {
 
     let trebleTotal = 0, bassTotal = 0;
     notes.forEach(note => {
-        if (!note.note || note.duration === 'hr') return; // skip rests
+        if (!note.note || note.duration === 'hr' || note.duration === 'qr') return; // skip rests
         const midi = noteToNumber(note.note);
         trebleTotal += countLedgerLines(midi, 'treble');
         bassTotal += countLedgerLines(midi, 'bass');
@@ -1796,9 +2104,9 @@ function updateNotesList() {
     userContraponto.forEach((nota, idx) => {
         const span = document.createElement('span');
         span.className = 'note-item';
-        const durDisplay = { 'w':'𝅜', 'h':'𝅗𝅥', 'q':'♩', '8':'♪', 'hr':'𝄽' }[nota.duration] || nota.duration;
+        const durDisplay = { 'w':'𝅜', 'h':'𝅗𝅥', 'q':'♩', '8':'♪', 'hr':'𝄼', 'qr':'𝄽' }[nota.duration] || nota.duration;
         let label;
-        if (nota.duration === 'hr' || nota.note === null) {
+        if (nota.duration === 'hr' || nota.duration === 'qr' || nota.note === null) {
             label = `${durDisplay} Pausa`;
             span.style.background = '#666';
         } else {
@@ -1837,6 +2145,24 @@ function showFeedback(message, isCorrect) {
     setTimeout(() => toast.remove(), 3500);
 }
 
+function showFeedbackPersistente(message, isCorrect) {
+    // remove qualquer toast persistente anterior
+    document.querySelectorAll('.feedback-toast-persistente')
+            .forEach(t => t.remove());
+
+    const toast = document.createElement('div');
+    toast.className = 'feedback-toast feedback-toast-persistente';
+    toast.style.backgroundColor = isCorrect ? '#3a8b5a' : '#8b3a3a';
+    toast.innerHTML = message + '<br><small style="opacity:0.7">(clique em qualquer lugar para fechar)</small>';
+    document.body.appendChild(toast);
+
+    // remove no primeiro clique em qualquer lugar (com pequeno delay
+    // para evitar que o próprio clique que disparou o toast o feche)
+    setTimeout(() => {
+        document.addEventListener('click', () => toast.remove(), { once: true });
+    }, 200);
+}
+
 // ==================== FLUXO DE QUESTÕES ====================
 function updateNextButtonText() {
     const q = questions[currentQuestionIndex];
@@ -1851,6 +2177,8 @@ function updateNextButtonText() {
 }
 
 function handleNextOrValidate() {
+    // Bloqueia se já estiver na última questão respondida
+    if (questionAnswered && currentQuestionIndex === questions.length - 1) return;
     const q = questions[currentQuestionIndex];
     
     if (q && q.tipo === 'c' && !questionAnswered) {
@@ -1865,10 +2193,14 @@ function handleNextOrValidate() {
                 return;
             }
         } else if (currentSpecies === 3) {
-            const isPausaFmt = userContraponto.length === 6 && userContraponto[0]?.duration === 'hr';
-            const isStdFmt   = userContraponto.length === 5;
-            if (!isStdFmt && !isPausaFmt) {
-                showFeedback('⚠️ 3ª espécie: insira 5 notas (♩ ♩ ♩ ♩ | 𝅜) ou 6 com pausa inicial (𝄽 ♩ ♩ | ♩ ♩ ♩)', false);
+            // Aceita formatos a(5), b(6), c(5), d(7) — validação de durações ocorre em analisarContraponto3aEspecie
+            const d0 = userContraponto[0]?.duration;
+            const len = userContraponto.length;
+            const fmtOk = (d0==='q'&&len===5) || (d0==='hr'&&len===6) || (d0==='qr'&&len===5) || (d0==='qr'&&len===7);
+            if (!fmtOk) {
+                const q3 = questions[currentQuestionIndex];
+                const esperado = (q3 && q3.ritmoModelo) ? RITMO_DISPLAY[q3.ritmoModelo] : '♩ ♩ ♩ ♩ | 𝅜';
+                showFeedback(`⚠️ 3ª espécie: número de notas incorreto para o modelo sorteado (${esperado})`, false);
                 return;
             }
         }
@@ -2094,86 +2426,13 @@ function endExercise() {
         qtd: questions.length/3
     };
     
-    attemptsHistory.push(reg); 
+    attemptsHistory.push(reg);
     sessionAttemptCount++;
     saveHistory(); 
     generateReport(reg);
     
     const rb = document.getElementById('generate-report-btn'); 
     if (rb) rb.disabled = false;
-
-    onExerciseEnd();
-}
-
-// Chamada ao fim do exercício: reativa start-btn como "NOVA TENTATIVA"
-function onExerciseEnd() {
-    const sb = document.getElementById('start-btn');
-    if (sb) {
-        sb.disabled = false;
-        sb.innerHTML = '🔄 NOVA TENTATIVA';
-        sb.className = 'success';
-    }
-}
-
-// Reseta a interface para o estado inicial (idle), chamado por "Finalizar Exercício"
-function finalizeExercise() {
-    // Limpa dados da sessão atual
-    questions = [];
-    currentQuestionIndex = 0;
-    userAnswers = [];
-    questionAttempts = [];
-    questionScores = [];
-    currentQuestionResponse = null;
-    userContraponto = [];
-    questionAnswered = false;
-    sessionAttemptCount = 0;
-
-    // Limpa canvas
-    const canvas = document.getElementById('notation-canvas');
-    if (canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-
-    // Oculta relatório
-    const ra = document.getElementById('report-area');
-    if (ra) ra.classList.remove('show');
-    const rc = document.getElementById('report-content');
-    if (rc) rc.innerHTML = '';
-
-    // Reseta área de questão
-    const qt = document.getElementById('question-text');
-    if (qt) qt.innerHTML = '-';
-    const pi = document.getElementById('progress-info');
-    if (pi) pi.innerHTML = 'Clique em "INICIAR" para começar';
-    const ac = document.getElementById('alternatives-container');
-    if (ac) ac.innerHTML = '';
-
-    // Oculta piano virtual
-    const pianoDiv = document.getElementById('virtual-piano');
-    if (pianoDiv) pianoDiv.style.display = 'none';
-
-    // Libera seletor de espécie
-    const ss = document.getElementById('species-select');
-    if (ss) ss.disabled = false;
-
-    // Reseta botões
-    const sb = document.getElementById('start-btn');
-    if (sb) {
-        sb.disabled = false;
-        sb.innerHTML = '▶ INICIAR EXERCÍCIO';
-        sb.className = 'success';
-    }
-    const rb = document.getElementById('generate-report-btn');
-    if (rb) rb.disabled = true;
-    const fb = document.getElementById('reset-btn');
-    if (fb) fb.disabled = true;
-
-    // Reseta botões next/play
-    const nb = document.getElementById('next-btn');
-    if (nb) { nb.disabled = true; nb.innerHTML = '⏩ Próxima'; }
-    const pb = document.getElementById('play-btn');
-    if (pb) pb.disabled = true;
 }
 
 function msParaHHMMSS(ms) { const totalSeg = Math.floor(ms / 1000); return `${String(Math.floor(totalSeg / 3600)).padStart(2,'0')}:${String(Math.floor((totalSeg % 3600) / 60)).padStart(2,'0')}:${String(totalSeg % 60).padStart(2,'0')}`; }
@@ -2208,7 +2467,6 @@ function generateReport(last) {
             </div>
             <div class="stat-card">
                 <h4>⏱️ Estatísticas de Tempo</h4>
-                // DEPOIS
                 <p><strong>Tentativas nesta sessão:</strong> ${sessionAttemptCount}</p>
                 <p><strong>Tentativas no histórico:</strong> ${attemptsHistory.length}</p>
                 <p><strong>Média:</strong> ${msParaHHMMSS(mediaMs)}</p>
@@ -2259,7 +2517,7 @@ function startExercise() {
     if (ss) ss.disabled = true;
 
     generateRandomTonality();
-    questions = generateQuestions(0, 0, 10);
+    questions = generateQuestions(5, 5, 5);
     
     if (questions.length === 0) { 
         alert('Erro: Nenhuma questão foi gerada. Tente novamente ou mude a espécie.'); 
@@ -2280,18 +2538,11 @@ function startExercise() {
     renderCurrentQuestion();
     
     const sb = document.getElementById('start-btn'); 
-    if (sb) {
-        sb.disabled = true;
-        sb.innerHTML = '▶ INICIAR EXERCÍCIO';
-    }
+    if (sb) sb.disabled = true;
     const rb = document.getElementById('generate-report-btn'); 
     if (rb) rb.disabled = true;
     const ra = document.getElementById('report-area'); 
     if (ra) ra.classList.remove('show');
-
-    // Ativa o botão Finalizar Exercício a partir do primeiro início
-    const fb = document.getElementById('reset-btn');
-    if (fb) fb.disabled = false;
 }
 
 document.addEventListener('keydown', e => {
@@ -2311,15 +2562,25 @@ document.addEventListener('keydown', e => {
         }
         e.preventDefault();
     }
+    // Q = inserir pausa de semínima (apenas 3ª espécie, tipo C)
+    if ((e.key === 'q' || e.key === 'Q') && currentSpecies === 3) {
+        const q = questions[currentQuestionIndex];
+        if (q && q.tipo === 'c' && !questionAnswered) {
+            userContraponto.push({ note: null, duration: 'qr' });
+            updateNotesList();
+            drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
+        }
+        e.preventDefault();
+    }
 });
 document.querySelectorAll('.duration-btn').forEach(btn => {
     btn.onclick = () => {
         const dur = btn.getAttribute('data-duration');
-        if (dur === 'hr') {
-            // Pausa de mínima: inserir diretamente no contraponto (não altera selectedDuration)
+        if (dur === 'hr' || dur === 'qr') {
+            // Pausas: inserir diretamente no contraponto (não altera selectedDuration)
             const q = questions[currentQuestionIndex];
             if (q && q.tipo === 'c' && !questionAnswered) {
-                userContraponto.push({ note: null, duration: 'hr' });
+                userContraponto.push({ note: null, duration: dur });
                 updateNotesList();
                 drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
             }
@@ -2334,27 +2595,12 @@ const defBtn = document.querySelector('[data-duration="h"]'); if (defBtn) defBtn
 document.querySelectorAll('button').forEach(btn => btn.addEventListener('click', activateAudio));
 const sb = document.getElementById('start-btn'); if (sb) sb.onclick = startExercise;
 const rb = document.getElementById('reset-btn'); if (rb) rb.onclick = () => {
-    // Abre o modal de confirmação de finalização
-    const fm = document.getElementById('finalize-modal');
-    if (fm) fm.style.display = 'flex';
-
-    const saveBtn = document.getElementById('finalize-save-btn');
-    const discardBtn = document.getElementById('finalize-discard-btn');
-    const cancelBtn = document.getElementById('finalize-cancel-btn');
-
-    const closeModal = () => { if (fm) fm.style.display = 'none'; };
-
-    if (saveBtn) saveBtn.onclick = async () => {
-        closeModal();
-        // Só exporta se houver relatório disponível
-        const rc = document.getElementById('report-content');
-        if (rc && rc.innerHTML.trim()) {
-            await exportPDF();
-        }
-        finalizeExercise();
-    };
-    if (discardBtn) discardBtn.onclick = () => { closeModal(); finalizeExercise(); };
-    if (cancelBtn) cancelBtn.onclick = () => closeModal();
+    if (confirm('Deseja salvar o relatório antes de finalizar?')) {
+        exportPDF().finally(() => { sessionAttemptCount = 0; location.reload(); });
+    } else {
+        sessionAttemptCount = 0;
+        location.reload();
+    }
 };
 const rpt = document.getElementById('generate-report-btn'); if (rpt) rpt.onclick = exportPDF;
 const clr = document.getElementById('clear-all-notes'); if (clr) clr.onclick = clearAllNotes;
@@ -2362,8 +2608,11 @@ const clr = document.getElementById('clear-all-notes'); if (clr) clr.onclick = c
 // Mostrar/ocultar botão de pausa de mínima conforme a espécie selecionada
 function updateRestButtonVisibility() {
     const restBtn = document.getElementById('rest-btn');
+    const restQrBtn = document.getElementById('rest-qr-btn');
     const speciesVal = parseInt(document.getElementById('species-select')?.value || '2');
-    if (restBtn) restBtn.style.display = speciesVal === 3 ? '' : 'none';
+    const show = speciesVal === 3 ? '' : 'none';
+    if (restBtn) restBtn.style.display = show;
+    if (restQrBtn) restQrBtn.style.display = show;
 }
 const speciesSel = document.getElementById('species-select');
 if (speciesSel) speciesSel.addEventListener('change', updateRestButtonVisibility);
@@ -2372,7 +2621,7 @@ updateRestButtonVisibility();
 loadHistory();
 initPiano();
 setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
-console.log('✅ Sistema de Contraponto carregado - v27.04.28');
+console.log('✅ Sistema de Contraponto carregado - v26.04.21');
 </script>
 </body>
 </html>
