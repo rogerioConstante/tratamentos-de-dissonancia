@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v26.04.21</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v26.05.1</title>
 
     <!-- BIBLIOTECAS -->
     <script src="./libs/vexflow.js"></script>
@@ -90,8 +90,8 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1>🎵 <span>Contraponto & Dissonâncias</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.04.21</div>
+        <h1>🎵 <span>Tratamentos de Dissonância</span> 🎵</h1>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.05.1</div>
     </div>
 
     <div class="config-panel">
@@ -327,6 +327,35 @@ async function playScoreTone(cantus, contraponto) {
         const durMap = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25, 'hr': 1.0, 'qr': 0.5 };
         const instrumentType = document.getElementById('instrument-select')?.value || 'fm';
 
+        // ── Fundir notas ligadas na 4ª espécie (prep + diss → uma nota de duração somada) ──
+        function resolverLigadura(cp) {
+            if (currentSpecies !== 4 || !cp || cp.length < 2) return cp;
+            // Detectar modelo: S1 = [hr, h, h, h], S2 = [h, h, h, h]
+            const d0 = cp[0]?.duration;
+            let prepIdx = -1, dissIdx = -1;
+            if (d0 === 'hr' || d0 === 'h') { prepIdx = 1; dissIdx = 2; }
+            if (prepIdx < 0 || dissIdx >= cp.length) return cp;
+            // Só fundir se prep e diss forem a mesma nota (ligadura real)
+            const prep = cp[prepIdx];
+            const diss = cp[dissIdx];
+            if (!prep?.note || !diss?.note || prep.note !== diss.note) return cp;
+            // Construir nova lista: substituir prep pela nota fundida, omitir diss
+            const durPrep = durMap[prep.duration] || 1;
+            const durDiss = durMap[diss.duration] || 1;
+            const durFundida = durPrep + durDiss;
+            // Encontrar duration string correspondente à duração somada
+            const durStr = Object.entries(durMap).find(([k, v]) => Math.abs(v - durFundida) < 0.001)?.[0] || 'w';
+            const resultado = [];
+            for (let i = 0; i < cp.length; i++) {
+                if (i === prepIdx) resultado.push({ note: prep.note, duration: durStr });
+                else if (i === dissIdx) continue; // omitir: já fundida com prep
+                else resultado.push(cp[i]);
+            }
+            return resultado;
+        }
+
+        const contrapontoPlayback = resolverLigadura(contraponto);
+
         if (instrumentType === 'sampler') {
             if (!samplerPiano || !samplerPiano.loaded) {
                 setAudioStatus("⏳ Aguarde — amostras ainda carregando...", true);
@@ -340,7 +369,7 @@ async function playScoreTone(cantus, contraponto) {
                 tC += dur;
             });
             let tCP = 0;
-            (contraponto || []).forEach(n => {
+            (contrapontoPlayback || []).forEach(n => {
                 const dur = durMap[n.duration] || 1;
                 if (n.note !== null && n.duration !== 'hr' && n.duration !== 'qr') {
                     const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
@@ -367,9 +396,9 @@ async function playScoreTone(cantus, contraponto) {
             tC += dur;
         });
         let tCP = 0;
-        (contraponto || []).forEach(n => {
+        (contrapontoPlayback || []).forEach(n => {
             const dur = durMap[n.duration] || 1;
-            if (n.note !== null && n.duration !== 'hr') {
+            if (n.note !== null && n.duration !== 'hr' && n.duration !== 'qr') {
                 synthCP.triggerAttackRelease(n.note.replace('/', ''), dur * 0.9, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
             }
             tCP += dur;
@@ -386,13 +415,13 @@ async function playScore(cantus, contraponto) { await playScoreTone(cantus, cont
 const tratamentosPorEspecie = {
     2: ['Nota de passagem', 'Bordadura Inferior', 'Bordadura Superior', 'Sem Dissonâncias'],
     3: ['Nota de passagem', 'Bordadura', 'Cambiata', 'Bordadura dupla', 'Grupo de notas de passagem', 'Nota de passagem acentuada', 'Bordadura acentuada'],
-    4: ['Nota de passagem', 'Bordadura', 'Suspensão e retardo'],
+    4: ['Suspensão', 'Retardo', 'Nota de passagem', 'Bordadura Superior', 'Bordadura Inferior'],
     5: ['Nota de passagem', 'Bordadura', 'Cambiata', 'Bordadura dupla', 'Grupo de notas de passagem', 'Nota de passagem acentuada', 'Bordadura acentuada', 'Suspensão e retardo', 'Suspensão com resolução interrompida', 'Apojatura', 'Antecipação']
 };
 const tratamentosGeraveis = {
     2: ['Nota de passagem', 'Bordadura Inferior', 'Bordadura Superior'],
     3: [...tratamentosPorEspecie[3]],
-    4: [...tratamentosPorEspecie[4]],
+    4: ['Suspensão', 'Retardo', 'Nota de passagem', 'Bordadura Superior', 'Bordadura Inferior'],
     5: [...tratamentosPorEspecie[5]]
 };
 
@@ -421,7 +450,6 @@ const TONALITIES = [
     { name: "F Menor", tonic: "F", type: "minor", accidentals: 4, preferFlats: true },
     { name: "Bb Menor", tonic: "Bb", type: "minor", accidentals: 5, preferFlats: true }
 ];
-
 function getKeySignatureString(tonalityName) {
     const sigMap = {
         'C Maior': 'C', 'G Maior': 'G', 'D Maior': 'D', 'A Maior': 'A', 'E Maior': 'E', 'B Maior': 'B',
@@ -431,7 +459,6 @@ function getKeySignatureString(tonalityName) {
     };
     return sigMap[tonalityName] || 'C';
 }
-
 function generateScale(tonic, type, preferFlats = false) {
     const intervals = type === 'major' ? [0,2,4,5,7,9,11] : [0,2,3,5,7,8,10];
     
@@ -451,7 +478,6 @@ function generateScale(tonic, type, preferFlats = false) {
     
     return intervals.map(i => notesArray[(startIndex + i) % 12]);
 }
-
 function generateRandomTonality() {
     const majors = TONALITIES.filter(t => t.type === 'major');
     const tonality = majors[Math.floor(Math.random() * majors.length)];
@@ -481,9 +507,6 @@ let questionScores = [];
 let startTimePerf = null;
 let startTimeDate = null;
 let endTime = null;
-let attemptId = 0;
-let attemptsHistory = [];
-let sessionAttemptCount = 0;
 let currentQuestionResponse = null;
 let userContraponto = [];
 let selectedDuration = 'h';
@@ -496,7 +519,6 @@ function isConsonant(semitones) {
     const mod = Math.abs(semitones) % 12;
     return [0,3,4,7,8,9].includes(mod);
 }
-
 function scaleStep(vexNote, steps) {
     const num = noteToNumber(vexNote);
     const dir = steps > 0 ? 1 : -1;
@@ -509,7 +531,6 @@ function scaleStep(vexNote, steps) {
     }
     return numberToNote(current);
 }
-
 function embaralhar(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -517,7 +538,6 @@ function embaralhar(array) {
     }
     return array;
 }
-
 function generateCantusFirmus(isUpperVoice) {
     const octMin = isUpperVoice ? 4 : 2;
     const octMax = isUpperVoice ? 5 : 3;
@@ -536,14 +556,12 @@ function generateCantusFirmus(isUpperVoice) {
     } while (attempts < 200);
     return [{ note: n1, duration: 'w' }, { note: n2, duration: 'w' }];
 }
-
 function hasCruzamento(cpNote, cantusNote, cpAbaixo) {
     const cpNum = noteToNumber(cpNote);
     const cantusNum = noteToNumber(cantusNote);
     if (cpAbaixo) return cpNum > cantusNum;
     else return cpNum < cantusNum;
 }
-
 function hasParalelas(cpA, cpB, cantusA, cantusB) {
     // Movimento oblíquo: uma das vozes não se move → não é paralelo
     if (noteToNumber(cpA) === noteToNumber(cpB)) return false;
@@ -553,7 +571,6 @@ function hasParalelas(cpA, cpB, cantusA, cantusB) {
     if (intA !== intB) return false;
     return intA === 0 || intA === 7;
 }
-
 function gerarContraponto2aEspecie(tratamento, cantusNotes, isUpperVoice) {
     if (!cantusNotes || cantusNotes.length < 2) return null;
     const cantusNote1 = cantusNotes[0].note;
@@ -601,7 +618,6 @@ function gerarContraponto2aEspecie(tratamento, cantusNotes, isUpperVoice) {
     }
     return null;
 }
-
 function gerarParValido(tratamento, isUpperVoice, maxTentativas = 20) {
     for (let tentativa = 0; tentativa < maxTentativas; tentativa++) {
         const cantus = generateCantusFirmus(isUpperVoice);
@@ -610,14 +626,20 @@ function gerarParValido(tratamento, isUpperVoice, maxTentativas = 20) {
             contraponto = gerarContraponto2aEspecie(tratamento, cantus, isUpperVoice);
         } else if (currentSpecies === 3) {
             contraponto = gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice);
+        } else if (currentSpecies === 4) { //console.log("--- gerarParValido - 4ª esp.:", tentativa)
+            const resultado4 = gerarContraponto4aEspecie(tratamento, cantus, isUpperVoice);
+            if (resultado4) {
+                contraponto = resultado4.notas;
+                // Fallback: se ritmoModelo não veio (caso de NP/Bordaduras), define como 'np'
+                cantus._ritmoModelo4 = resultado4.ritmoModelo || 'np';
+            }
         }
-        if (contraponto !== null && contraponto.length > 0) {
+        if (Array.isArray(contraponto) && contraponto.length > 0) {
             return { success: true, cantus, contraponto };
         }
     }
     return { success: false };
 }
-
 // ==================== 3ª ESPÉCIE — GERAÇÃO ====================
 // Helpers
 function isStep(a, b) {
@@ -1126,7 +1148,6 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
 
     return null;
 }
-
 // ==================== 3ª ESPÉCIE — ANÁLISE ====================
 function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo) {
     if (!userCP || userCP.length < 4) return { ok: false, erro: 'Número de notas insuficiente' };
@@ -1283,7 +1304,217 @@ function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
 
     return { ok: true };
 }
+// ==================== 4ª ESPÉCIE — GERAÇÃO ====================
+function sortearTratamento4aEspecie() {
+    const r = Math.random() * 100;
+    let tratamento;
 
+    if (r < 55) {
+        tratamento = 'Suspensão';
+    } else if (r < 80) {
+        tratamento = 'Retardo';
+    } else if (r < 90) {
+        tratamento = 'Nota de passagem';
+    } else if (r < 96) {
+        tratamento = 'Bordadura Inferior';
+    } else {
+        tratamento = 'Bordadura Superior';
+    }
+    return tratamento
+}
+function gerarContraponto4aEspecie(tratamento, cantusNotes, isUpperVoice) {
+    if (!cantusNotes || cantusNotes.length < 2) return null;
+    const cf1 = cantusNotes[0].note;
+    const cf2 = cantusNotes[1].note;
+    const s1 = noteToNumber(cf1);
+    const s2 = noteToNumber(cf2);
+    const cpAbaixo = isUpperVoice;
+
+    // NP e Bordaduras: reutiliza lógica da 2ª espécie, modelo 'np' (h h w)
+    if (tratamento === 'Nota de passagem' || tratamento === 'Bordadura Superior' || tratamento === 'Bordadura Inferior') {
+        const trat2 = tratamento === 'Nota de passagem' ? 'Nota de passagem'
+                    : tratamento === 'Bordadura Superior' ? 'Bordadura Superior'
+                    : 'Bordadura Inferior';
+        const notasGeradas = gerarContraponto2aEspecie(trat2, cantusNotes, isUpperVoice);
+        if (!notasGeradas) return null;
+        return {
+            notas: notasGeradas,
+            ritmoModelo: 'np'
+        };
+    }
+
+    // Suspensão e Retardo
+    const resolvDown = (tratamento === 'Suspensão');
+    const rangeMin = cpAbaixo ? s1 - 19 : s1 + 1;
+    const rangeMax = cpAbaixo ? s1 - 1  : s1 + 19;
+
+    // Modelos: S1 = [hr, prep, diss(=prep), res]  S2 = [cons, prep, diss(=prep), res]
+    // A diss é a mesma nota que prep — deve ser consonante com CF1 e dissonante com CF2
+    const candidatos = [];
+    for (let num = rangeMin; num <= rangeMax; num++) {
+        const vex = numberToNote(num);
+        if (!currentScale.includes(vex.split('/')[0])) continue;
+        if (!isConsonant(num - s1)) continue;   // prep consonante com CF1
+        if (isConsonant(num - s2)) continue;    // mesma nota dissonante com CF2
+        candidatos.push(vex);
+    }
+    if (candidatos.length === 0) return null;
+
+    const shuffled = embaralhar([...candidatos]);
+    for (const prep of shuffled) {
+        const prepNum = noteToNumber(prep);
+        // Resolução: grau conjunto descendente (Suspensão) ou ascendente (Retardo)
+        const dir = resolvDown ? -1 : 1;
+        const res = scaleStep(prep, dir);
+        if (!res) continue;
+        if (!currentScale.includes(res.split('/')[0])) continue;
+        if (!isConsonant(noteToNumber(res) - s2)) { continue; };
+        if (hasCruzamento(prep, cf1, cpAbaixo)) { continue; };
+        if (hasCruzamento(res,  cf2, cpAbaixo)) { continue; };
+        //if (hasParalelas(prep, res, cf1, cf2)) { console.log(": teste prep. res paralelas: falhou!"); continue; };
+
+        // Sortear modelo S1 ou S2 aleatoriamente
+        const modelo = Math.random() < 0.5 ? 's1' : 's2';
+
+        if (modelo === 's1') {
+            // [pausa_h, prep(t2c1), diss=prep(t1c2), res(t2c2)]
+            return {
+                notas: [
+                    { note: null, duration: 'hr' },
+                    { note: prep, duration: 'h' },
+                    { note: prep, duration: 'h' },
+                    { note: res,  duration: 'h' }
+                ],
+                ritmoModelo: 's1'
+            };
+        } else {
+            // [cons(t1c1), prep(t2c1), diss=prep(t1c2), res(t2c2)]
+            // Buscar cons livre para t1c1
+            const consMin = cpAbaixo ? s1 - 19 : s1 + 1;
+            const consMax = cpAbaixo ? s1 - 1  : s1 + 19;
+            const consCands = [];
+            for (let num = consMin; num <= consMax; num++) {
+                const vex = numberToNote(num);
+                if (!currentScale.includes(vex.split('/')[0])) { continue; };
+                if (!isConsonant(num - s1)) { continue; };
+                if (hasCruzamento(vex, cf1, cpAbaixo)) { continue; };
+                consCands.push(vex);
+            }
+            const consShuffled = embaralhar(consCands);
+            for (const consLivre of consShuffled) {
+                //if (hasParalelas(consLivre, res, cf1, cf2)) { console.log(": teste cons. livre paralelas: falhou!"); continue; };
+                return {
+                    notas: [
+                        { note: consLivre, duration: 'h' },
+                        { note: prep,      duration: 'h' },
+                        { note: prep,      duration: 'h' },
+                        { note: res,       duration: 'h' }
+                    ],
+                    ritmoModelo: 's2'
+                };
+            }
+        }
+    }
+    return null;
+}
+// ==================== 4ª ESPÉCIE — ANÁLISE ====================
+function analisarContraponto4aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo) {
+    const cf1 = cantus[0].note;
+    const cf2 = cantus[1].note;
+    const cons = (n, cf) => isConsonant(noteToNumber(n) - noteToNumber(cf));
+    const diss = (n, cf) => !cons(n, cf);
+
+    const d = userCP.map(n => n.duration);
+    const len = userCP.length;
+
+    // NP e Bordaduras: modelo 'np' = [h, h, w], 3 elementos
+    if (tratamentoEsperado === 'Nota de passagem' ||
+        tratamentoEsperado === 'Bordadura Superior' ||
+        tratamentoEsperado === 'Bordadura Inferior') {
+        if (ritmoModelo !== 'np') {
+            return { ok: false, erro: 'Modelo rítmico incorreto para NP/Bordadura (esperado: 𝅗𝅥 𝅗𝅥 | 𝅜)' };
+        }
+        // Reutiliza análise da 2ª espécie
+        const trat2 = tratamentoEsperado;
+        return analisarContraponto2aEspecie(userCP, cantus, trat2);
+    }
+
+    // Suspensão e Retardo
+    const resolvDown = (tratamentoEsperado === 'Suspensão');
+
+    // Determinar formato pelo ritmoModelo sorteado (não pelo conteúdo)
+    if (ritmoModelo === 's1') {
+        // Esperado: [hr, h, h, h]  — 4 elementos
+        if (len !== 4 || d[0] !== 'hr' || d[1] !== 'h' || d[2] !== 'h' || d[3] !== 'h') {
+            return { ok: false, erro: 'Durações incorretas. Esperado: 𝄼 𝅗𝅥 | 𝅗𝅥_ 𝅗𝅥' };
+        }
+        const prep = userCP[1].note;
+        const disso = userCP[2].note;
+        const res   = userCP[3].note;
+
+        if (noteToNumber(prep) !== noteToNumber(disso))
+            return { ok: false, erro: 'Suspensão/Retardo: a dissonância (3ª nota) deve ser a mesma nota da preparação (2ª nota), sustentada por ligadura' };
+        if (!cons(prep, cf1))
+            return { ok: false, erro: 'Suspensão/Retardo: preparação deve ser consonante com o CF do 1º compasso' };
+        if (!diss(disso, cf2))
+            return { ok: false, erro: 'Suspensão/Retardo: a nota sustentada deve ser dissonante com o CF do 2º compasso' };
+        if (!cons(res, cf2))
+            return { ok: false, erro: 'Suspensão/Retardo: resolução deve ser consonante com o CF do 2º compasso' };
+        if (!isStep(disso, res))
+            return { ok: false, erro: 'Suspensão/Retardo: resolução deve ser por grau conjunto (2ª)' };
+        const dirRes = Math.sign(noteToNumber(res) - noteToNumber(disso));
+        if (resolvDown && dirRes !== -1)
+            return { ok: false, erro: 'Suspensão: resolução deve descer por grau conjunto' };
+        if (!resolvDown && dirRes !== 1)
+            return { ok: false, erro: 'Retardo: resolução deve subir por grau conjunto' };
+        if (hasCruzamento(prep, cf1, noteToNumber(prep) < noteToNumber(cf1)))
+            return { ok: false, erro: 'Cruzamento de vozes na preparação' };
+        if (hasCruzamento(res, cf2, noteToNumber(res) < noteToNumber(cf2)))
+            return { ok: false, erro: 'Cruzamento de vozes na resolução' };
+        return { ok: true };
+    }
+
+    if (ritmoModelo === 's2') {
+        // Esperado: [h, h, h, h]  — 4 elementos
+        if (len !== 4 || d[0] !== 'h' || d[1] !== 'h' || d[2] !== 'h' || d[3] !== 'h') {
+            return { ok: false, erro: 'Durações incorretas. Esperado: 𝅗𝅥 𝅗𝅥 | 𝅗𝅥_ 𝅗𝅥' };
+        }
+        const consLivre = userCP[0].note;
+        const prep  = userCP[1].note;
+        const disso = userCP[2].note;
+        const res   = userCP[3].note;
+        const cpAbaixo = noteToNumber(consLivre) < noteToNumber(cf1);
+
+        if (!cons(consLivre, cf1))
+            return { ok: false, erro: 'S2: 1ª mínima deve ser consonante com o CF (consonância livre)' };
+        if (noteToNumber(prep) !== noteToNumber(disso))
+            return { ok: false, erro: 'Suspensão/Retardo: a dissonância (3ª nota) deve ser a mesma nota da preparação (2ª nota), sustentada por ligadura' };
+        if (!cons(prep, cf1))
+            return { ok: false, erro: 'Suspensão/Retardo: preparação deve ser consonante com o CF do 1º compasso' };
+        if (!diss(disso, cf2))
+            return { ok: false, erro: 'Suspensão/Retardo: a nota sustentada deve ser dissonante com o CF do 2º compasso' };
+        if (!cons(res, cf2))
+            return { ok: false, erro: 'Suspensão/Retardo: resolução deve ser consonante com o CF do 2º compasso' };
+        if (!isStep(disso, res))
+            return { ok: false, erro: 'Suspensão/Retardo: resolução deve ser por grau conjunto (2ª)' };
+        const dirRes = Math.sign(noteToNumber(res) - noteToNumber(disso));
+        if (resolvDown && dirRes !== -1)
+            return { ok: false, erro: 'Suspensão: resolução deve descer por grau conjunto' };
+        if (!resolvDown && dirRes !== 1)
+            return { ok: false, erro: 'Retardo: resolução deve subir por grau conjunto' };
+        if (hasCruzamento(consLivre, cf1, cpAbaixo))
+            return { ok: false, erro: 'Cruzamento de vozes na 1ª mínima' };
+        if (hasCruzamento(prep, cf1, cpAbaixo))
+            return { ok: false, erro: 'Cruzamento de vozes na preparação' };
+        if (hasCruzamento(res, cf2, cpAbaixo))
+            return { ok: false, erro: 'Cruzamento de vozes na resolução' };
+        if (hasParalelas(consLivre, res, cf1, cf2))
+            return { ok: false, erro: 'Paralelas proibidas entre a 1ª mínima e a resolução' };
+        return { ok: true };
+    }
+
+    return { ok: false, erro: 'Modelo rítmico não reconhecido para a 4ª espécie' };
+}
 // ── Helper: check that "extra" positions are cons and move narrowly ──
 function checkExtras(notas, cfNotas, extraIdxs) {
     for (const idx of extraIdxs) {
@@ -1297,7 +1528,6 @@ function checkExtras(notas, cfNotas, extraIdxs) {
     }
     return null; // no error
 }
-
 // ── Nota de passagem ──
 function analisarNP3(notas, cfNotas) {
     const [n1,n2,n3,n4,n5] = notas;
@@ -1329,7 +1559,6 @@ function analisarNP3(notas, cfNotas) {
     }
     return { ok: true };
 }
-
 // ── Bordadura ──
 function analisarBordadura3(notas, cfNotas) {
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
@@ -1354,7 +1583,6 @@ function analisarBordadura3(notas, cfNotas) {
     }
     return { ok: true };
 }
-
 // ── Cambiata ──
 function analisarCambiata3(notas, cfNotas) {
     const [n1,n2,n3,n4,n5] = notas;
@@ -1387,7 +1615,6 @@ function analisarCambiata3(notas, cfNotas) {
 
     return { ok: true };
 }
-
 // ── Bordadura dupla ──
 function analisarBordaduraDupla3(notas, cfNotas) {
     const cons = (n, cf) => isConsonant(noteToNumber(n) - noteToNumber(cf));
@@ -1432,7 +1659,6 @@ function analisarBordaduraDupla3(notas, cfNotas) {
 
     return { ok: false, erro: melhorErro };
 }
-
 // ── Grupo de notas de passagem ──
 function analisarGrupoNP3(notas, cfNotas) {
     const cons = (n, cf) => isConsonant(noteToNumber(n) - noteToNumber(cf));
@@ -1480,7 +1706,6 @@ function analisarGrupoNP3(notas, cfNotas) {
 
     return { ok: false, erro: melhorErro };
 }
-
 // ── NP Acentuada — formato padrão ──
 function analisarNPAcentuadaStd(notas, cfNotas) {
     // cons(extra) → cons(prep) → diss(NP) → cons(res) | cons(extra)
@@ -1501,7 +1726,6 @@ function analisarNPAcentuadaStd(notas, cfNotas) {
     if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'NP acentuada: salto entre posição 4 e a semibreve excede uma 5ª (não compensável)' };
     return { ok: true };
 }
-
 // ── Bordadura Acentuada — formato padrão ──
 function analisarBordaduraAcentuadaStd(notas, cfNotas) {
     const [n1,n2,n3,n4,n5] = notas;
@@ -1518,7 +1742,6 @@ function analisarBordaduraAcentuadaStd(notas, cfNotas) {
     if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'Bordadura acentuada: salto entre posição 4 e a semibreve excede uma 5ª (não compensável)' };
     return { ok: true };
 }
-
 // ── NP Acentuada — formato com pausa ──
 function analisarNPAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo) {
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
@@ -1536,7 +1759,6 @@ function analisarNPAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo) {
     if (!isLeapPermitido(n5, n6, null)) return { ok: false, erro: 'NP acentuada (pausa): salto entre posições 5 e 6 excede uma 5ª (não compensável)' };
     return { ok: true };
 }
-
 // ── Bordadura Acentuada — formato com pausa ──
 function analisarBordaduraAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo) {
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
@@ -1552,7 +1774,6 @@ function analisarBordaduraAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo)
     if (!isLeapPermitido(n5, n6, null)) return { ok: false, erro: 'Bordadura acentuada (pausa): salto entre posições 5 e 6 excede uma 5ª (não compensável)' };
     return { ok: true };
 }
-
 // ── NP Acentuada — formato c: [qr q q q | w] ──
 // notas reais: n2(t2,cf1) n3(t3,cf1) n4(t4,cf1) n5(t1c2,cf2)
 // Dissonância acentuada em t3 (n3)
@@ -1570,7 +1791,6 @@ function analisarNPAcentuadaFmtC(n2, n3, n4, n5, cf1, cf2, cpAbaixo) {
     if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'NP acentuada (fmt c): salto n4→semibreve excede uma 5ª' };
     return { ok: true };
 }
-
 // ── Bordadura Acentuada — formato c: [qr q q q | w] ──
 function analisarBordaduraAcentuadaFmtC(n2, n3, n4, n5, cf1, cf2, cpAbaixo) {
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
@@ -1584,7 +1804,6 @@ function analisarBordaduraAcentuadaFmtC(n2, n3, n4, n5, cf1, cf2, cpAbaixo) {
     if (!isLeapPermitido(n4, n5, null)) return { ok: false, erro: 'Bordadura acentuada (fmt c): salto n4→semibreve excede uma 5ª' };
     return { ok: true };
 }
-
 // ── NP Acentuada — formato d: [qr q q q | q q h] ──
 // notas reais: n2(t2,cf1) n3(t3,cf1) n4(t4,cf1) n5(t1c2,cf2) n6(t2c2,cf2) n7(t3-4c2,cf2)
 // Dissonância pode ocorrer em n3 (t3 do c1) e/ou n5 (t1 do c2)
@@ -1618,7 +1837,6 @@ function analisarNPAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbaixo) {
     if (!cons(n7, cf2)) return { ok: false, erro: 'NP acentuada (fmt d): mínima final (n7) deve ser consonante' };
     return { ok: true };
 }
-
 // ── Bordadura Acentuada — formato d: [qr q q q | q q h] ──
 function analisarBordaduraAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbaixo) {
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
@@ -1648,7 +1866,6 @@ function analisarBordaduraAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbai
     if (!cons(n7, cf2)) return { ok: false, erro: 'Bordadura acentuada (fmt d): mínima final (n7) deve ser consonante' };
     return { ok: true };
 }
-
 function analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado) {
     if (!userCP || userCP.length !== 3) return { ok: false, erro: 'Número de notas inválido (esperado: 3)' };
     const [n1, n2, n3] = userCP;
@@ -1706,17 +1923,18 @@ function analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado) {
     }
     return { ok: true };
 }
-
 function validarRespostaEscrita(q) {
     if (questionAnswered) return;
-    
+
     questionAttempts[currentQuestionIndex]++;
-    
+
     let resultado;
     if (currentSpecies === 2) {
         resultado = analisarContraponto2aEspecie(userContraponto, q.cantus, q.resposta);
     } else if (currentSpecies === 3) {
         resultado = analisarContraponto3aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || 'a');
+    } else if (currentSpecies === 4) {
+        resultado = analisarContraponto4aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || 'np');
     } else {
         resultado = { ok: false, erro: 'Espécie não implementada para validação escrita' };
     }
@@ -1741,10 +1959,9 @@ function validarRespostaEscrita(q) {
         questionAnswered = false;
     }
 }
-
 // ==================== MODELO RÍTMICO ====================
-// Padrões: a=[q,q,q,q][w], b=[hr,q,q][q,q,h], c=[qr,q,q,q][w], d=[qr,q,q,q][q,q,h]
 const RITMO_MODELOS = {
+    // 3ª espécie
     'Nota de passagem':        ['a','b','c','d'],
     'Bordadura':               ['a','b','c','d'],
     'Cambiata':                ['a','b','d'],
@@ -1752,8 +1969,13 @@ const RITMO_MODELOS = {
     'Grupo de notas de passagem': ['a','b','c','d'],
     'Nota de passagem acentuada': ['a','b','c','d'],
     'Bordadura acentuada':     ['a','b','c','d'],
+    // 4ª espécie
+    'Suspensão':               ['s1','s2'],
+    'Retardo':                 ['s1','s2'],
+    'Bordadura Superior':      ['np'],
+    'Bordadura Inferior':      ['np'],
 };
-const RITMO_PESOS = { 'a':4, 'b':3, 'c':2, 'd':1 }; // hierarquia de probabilidade
+const RITMO_PESOS = { 'a':4, 'b':3, 'c':2, 'd':1, 's1':1, 's2':1, 'np':1 };
 
 function sortearRitmoModelo(tratamento) {
     const modelos = RITMO_MODELOS[tratamento] || ['a'];
@@ -1771,12 +1993,16 @@ const RITMO_DISPLAY = {
     'b': '𝄼 ♩ ♩ | ♩ ♩ 𝅗𝅥',
     'c': '𝄽 ♩ ♩ ♩ | 𝅜',
     'd': '𝄽 ♩ ♩ ♩ | ♩ ♩ 𝅗𝅥',
+    's1': '𝄼 𝅗𝅥—|—𝅗𝅥 𝅗𝅥',
+    's2': '𝅗𝅥 𝅗𝅥—|—𝅗𝅥 𝅗𝅥',
+    'np': '𝅗𝅥 𝅗𝅥 | 𝅜',
 };
-
 // ==================== GERAÇÃO DE QUESTÕES ====================
 function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
     const tratamentos = [...tratamentosPorEspecie[currentSpecies]];
-    const tratamentosParaGerar = embaralhar([...tratamentosGeraveis[currentSpecies]]);
+    const tratamentosParaGerar = currentSpecies === 4
+        ? Array.from({length: qtdA + qtdB + qtdC}, () => sortearTratamento4aEspecie())
+        : embaralhar([...tratamentosGeraveis[currentSpecies]]);
     const tipoA = [], tipoB = [], tipoC = [];
     const assinaturasUsadas = new Set();
 
@@ -1851,7 +2077,7 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
         let parValido = null;
         for (let t = 0; t < 40; t++) {
             const isUpperC = Math.random() > 0.5;
-            const testPar = gerarParValido(tratamentoC, isUpperC, 1);
+            const testPar = gerarParValido(tratamentoC, isUpperC, 20);
             if (!testPar.success) continue;
             // Para tipo C o contraponto é do aluno: unicidade só pelo cantus
             const sigC = testPar.cantus.map(n => n.note).join('|');
@@ -1860,14 +2086,26 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
             parValido = { isUpperVoice: isUpperC, cantus: testPar.cantus };
             break;
         }
-        if (!parValido) { console.error(`❌ Não foi possível gerar cantus único para tipo C com tratamento "${tratamentoC}"`); continue; }
+        if (!parValido) { console.warn(`⚠️ Pulando questão do tipo C com tratamento "${tratamentoC}"`); continue; }
 
         let enunciado3;
-        let ritmoModelo3 = 'a';
+        let ritmoModelo3 = '';
         if (currentSpecies === 3) {
             ritmoModelo3 = sortearRitmoModelo(tratamentoC);
-            const ritmoStr = RITMO_DISPLAY[ritmoModelo3] || '♩ ♩ ♩ ♩ | 𝅜';
+            const ritmoStr = RITMO_DISPLAY[ritmoModelo3];
             enunciado3 = `Escreva um contraponto de 3ª espécie usando pelo menos uma dissonância tratada como <strong>"${tratamentoC}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; letter-spacing: 6px;">${ritmoStr}</span>`;
+        } else if (currentSpecies === 4) {
+            let instrucao4 = '', ritmoStr4 = '';
+            if (tratamentoC === 'Suspensão' || tratamentoC === 'Retardo') {
+                ritmoModelo3 = sortearRitmoModelo(tratamentoC);
+                ritmoStr4 = RITMO_DISPLAY[ritmoModelo3];
+                instrucao4 = `Insira a nota de preparação e depois a <strong>mesma nota</strong> novamente (ela será ligada como dissonância), seguida da resolução.`;
+            } else {
+                ritmoModelo3 = 'np';
+                ritmoStr4 = RITMO_DISPLAY[ritmoModelo3];
+                instrucao4 = `Use a estrutura: <strong>${ritmoStr4}</strong>.`;
+            }
+            enunciado3 = `Escreva um contraponto de 4ª espécie com o tratamento <strong>"${tratamentoC}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; letter-spacing: 6px;">${ritmoStr4}</span><br>`;
         } else {
             enunciado3 = `Escreva uma dissonância do tipo <strong>"${tratamentoC}"</strong> no contraponto — use a estrutura rítmica: <strong>mínima mínima semibreve</strong> (use o teclado abaixo):`;
         }
@@ -1888,7 +2126,6 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
     for (let i = all.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [all[i], all[j]] = [all[j], all[i]]; }
     return all;
 }
-
 // ==================== DESENHO DA PARTITURA ====================
 function drawBlankScore(cantusPosition, cantusClef, contraClef = null) {
     const canvas = document.getElementById('notation-canvas');
@@ -1919,7 +2156,6 @@ function drawBlankScore(cantusPosition, cantusClef, contraClef = null) {
         }
     } catch(e) { console.error('❌ Erro ao desenhar partitura vazia:', e); }
 }
-
 function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef = 'treble', contraClef = null) {
     const canvas = document.getElementById('notation-canvas');
     if (!canvas) return;
@@ -1996,6 +2232,8 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             voice.draw(context, stave);
         }
         
+        // Coletar todas as StaveNotes do contraponto (para ligaduras na 4ª espécie)
+        const allSnotesCP = [];
         for (let i = 0; i < numCompassos; i++) {
             const notasC = ccantus[i] || [], notasCP = ccp[i] || [];
             const snotesC = criarStaveNotes(notasC, cantusClef);
@@ -2004,10 +2242,47 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             const temposCP = notasCP.reduce((s,n) => s + (duracaoMap[n.duration] || 0), 0);
             desenharVoz(snotesC, stavesC[i], temposC);
             desenharVoz(snotesCP, stavesCP[i], temposCP);
+            allSnotesCP.push(...snotesCP);
+        }
+
+        // Desenhar ligadura na 4ª espécie (entre prep e diss, que são a mesma nota)
+        if (currentSpecies === 4 && contraponto && contraponto.length >= 2) {
+            // Encontrar as posições prep e diss no contraponto original
+            // S1: [hr, prep, diss, res] → índices 1 e 2
+            // S2: [cons, prep, diss, res] → índices 1 e 2
+            // NP: sem ligadura
+            const rm = (contraponto._ritmoModelo4) || '';
+            let prepIdx = -1, dissIdx = -1;
+            if (rm === 's1' || rm === 's2') {
+                prepIdx = rm === 's1' ? 1 : 1;
+                dissIdx = 2;
+            }
+            // Tentar detectar automaticamente se ritmoModelo não estiver disponível
+            if (prepIdx < 0 && contraponto.length === 4) {
+                const d0 = contraponto[0]?.duration;
+                if (d0 === 'hr') { prepIdx = 1; dissIdx = 2; }          // s1
+                else if (d0 === 'h') { prepIdx = 1; dissIdx = 2; }      // s2
+            }
+            if (prepIdx >= 0 && dissIdx >= 0 && allSnotesCP.length > dissIdx) {
+                try {
+                    // Mapear índices do contraponto para índices das StaveNotes (descontando pausas)
+                    let snoteIdx = 0;
+                    const idxMap = {};
+                    for (let ci = 0; ci < contraponto.length; ci++) {
+                        idxMap[ci] = snoteIdx;
+                        snoteIdx++;
+                    }
+                    const sn1 = allSnotesCP[idxMap[prepIdx]];
+                    const sn2 = allSnotesCP[idxMap[dissIdx]];
+                    if (sn1 && sn2) {
+                        const tie = new Vex.Flow.StaveTie({ first_note: sn1, last_note: sn2, first_indices: [0], last_indices: [0] });
+                        tie.setContext(context).draw();
+                    }
+                } catch(te) { console.warn('Ligadura: erro ao desenhar StaveTie', te); }
+            }
         }
     } catch(e) { console.error('❌ Erro ao desenhar partitura:', e); }
 }
-
 function bestClef(notes) {
     const trebleStaffBottom = 67; // B/3
     const trebleStaffTop = 77;    // F/5
@@ -2042,7 +2317,6 @@ function bestClef(notes) {
 
     return trebleTotal <= bassTotal ? 'treble' : 'bass';
 }
-
 // ==================== PIANO VIRTUAL ====================
 function initPiano() {
     const container = document.getElementById('piano-keys');
@@ -2079,7 +2353,6 @@ function initPiano() {
     });
     refreshPianoHighlight();
 }
-
 function refreshPianoHighlight() {
     const keys = document.querySelectorAll('.piano-key');
     keys.forEach(key => {
@@ -2095,7 +2368,6 @@ function refreshPianoHighlight() {
         }
     });
 }
-
 function updateNotesList() {
     const container = document.getElementById('inserted-notes-container');
     if (!container) return;
@@ -2126,7 +2398,6 @@ function updateNotesList() {
         container.appendChild(span);
     });
 }
-
 function clearAllNotes() { 
     if (!questionAnswered) {
         userContraponto = []; 
@@ -2135,7 +2406,6 @@ function clearAllNotes() {
         if (q && q.tipo === 'c') drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef);
     }
 }
-
 function showFeedback(message, isCorrect) {
     const toast = document.createElement('div');
     toast.className = 'feedback-toast';
@@ -2144,7 +2414,6 @@ function showFeedback(message, isCorrect) {
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
 }
-
 function showFeedbackPersistente(message, isCorrect) {
     // remove qualquer toast persistente anterior
     document.querySelectorAll('.feedback-toast-persistente')
@@ -2162,7 +2431,6 @@ function showFeedbackPersistente(message, isCorrect) {
         document.addEventListener('click', () => toast.remove(), { once: true });
     }, 200);
 }
-
 // ==================== FLUXO DE QUESTÕES ====================
 function updateNextButtonText() {
     const q = questions[currentQuestionIndex];
@@ -2175,7 +2443,6 @@ function updateNextButtonText() {
         nextBtn.innerHTML = '⏩ Próxima';
     }
 }
-
 function handleNextOrValidate() {
     // Bloqueia se já estiver na última questão respondida
     if (questionAnswered && currentQuestionIndex === questions.length - 1) return;
@@ -2203,10 +2470,35 @@ function handleNextOrValidate() {
                 showFeedback(`⚠️ 3ª espécie: número de notas incorreto para o modelo sorteado (${esperado})`, false);
                 return;
             }
+        } else if (currentSpecies === 4) {
+            const qAtual = questions[currentQuestionIndex];
+            const rm = qAtual?.ritmoModelo || 'np';
+            const len = userContraponto.length;
+            // s1=[hr,h,h,h]=4, s2=[h,h,h,h]=4, np=[h,h,w]=3
+            const lenEsperado = (rm === 'np') ? 3 : 4;
+            if (len !== lenEsperado) {
+                const esperado = RITMO_DISPLAY[rm] || '';
+                showFeedback(`⚠️ 4ª espécie: número de notas incorreto. Esperado: ${esperado} (${lenEsperado} elementos)`, false);
+                return;
+            }
         }
         
-        validarRespostaEscrita(q);
-        updateNextButtonText();
+        // Toca o contraponto antes de validar
+        const nextBtnTmp = document.getElementById('next-btn');
+        if (nextBtnTmp) nextBtnTmp.disabled = true;
+        activateAudio().then(() => {
+            playScore(q.cantus, userContraponto).then(() => {
+                const durTotal = userContraponto.reduce((s, n) => {
+                    const dm = { 'w':2000,'h':1000,'q':500,'8':250,'hr':1000,'qr':500 };
+                    return s + (dm[n.duration] || 1000);
+                }, 0);
+                setTimeout(() => {
+                    if (nextBtnTmp) nextBtnTmp.disabled = false;
+                    validarRespostaEscrita(q);
+                    updateNextButtonText();
+                }, durTotal + 300);
+            });
+        });
         return;
     }
     
@@ -2233,7 +2525,6 @@ function handleNextOrValidate() {
         proceedToNext();
     }
 }
-
 function renderCurrentQuestion() {
     if (!questions.length || currentQuestionIndex >= questions.length) return;
     const q = questions[currentQuestionIndex];
@@ -2322,7 +2613,6 @@ function renderCurrentQuestion() {
     
     refreshPianoHighlight();
 }
-
 function checkAnswer(choice, btn, q) {
     if (questionAnswered) return;
     
@@ -2363,7 +2653,6 @@ function checkAnswer(choice, btn, q) {
 
     updateNextButtonText();
 }
-
 function proceedToNext() {
     if (currentQuestionIndex + 1 < questions.length) { 
         currentQuestionIndex++; 
@@ -2375,125 +2664,158 @@ function proceedToNext() {
 }
 
 // ==================== RELATÓRIO ====================
-function loadHistory() { const saved = localStorage.getItem('contraponto_history_v9'); if (saved) { attemptsHistory = JSON.parse(saved); attemptId = attemptsHistory.length; } else { attemptsHistory = []; attemptId = 0; } }
-function saveHistory() { localStorage.setItem('contraponto_history_v9', JSON.stringify(attemptsHistory)); }
-
 function endExercise() {
-    endTime = performance.now();
-    const tempoMs = endTime - startTimePerf;
-    
     let acertos = 0;
     let somaPontuacoes = 0;
     const acertosPorTipo = { a:0, b:0, c:0 };
-    const totalPorTipo = { a:0, b:0, c:0 };
-    const acertosPorTrat = {};
-    const totalPorTrat = {};
-    
+    const totalPorTipo   = { a:0, b:0, c:0 };
+
     questions.forEach((q, idx) => {
         totalPorTipo[q.tipo]++;
-        totalPorTrat[q.tratamento] = (totalPorTrat[q.tratamento] || 0) + 1;
-        
         const pontuacao = questionScores[idx] || 0;
         somaPontuacoes += pontuacao;
-        
         if (pontuacao > 0) {
             acertos++;
             acertosPorTipo[q.tipo]++;
-            acertosPorTrat[q.tratamento] = (acertosPorTrat[q.tratamento] || 0) + 1;
         }
     });
-    
-    const notaFinal = ((somaPontuacoes / questions.length ) * 10).toFixed(2);
-    const nomeAluno = document.getElementById('student-name')?.value || 'Anônimo';
-    const reg = { 
-        id: ++attemptId, 
-        nome: nomeAluno, 
-        especie: currentSpecies + 'ª', 
-        tom: currentTonalityName, 
-        dataHoraInicio: startTimeDate.toLocaleString(), 
-        dataHoraFim: new Date().toLocaleString(), 
-        tempoMs, 
+
+    const notaFinal  = ((somaPontuacoes / questions.length) * 10).toFixed(2);
+    const nomeAluno  = document.getElementById('student-name')?.value || 'Anônimo';
+
+    const reg = {
+        nome:            nomeAluno,
+        especie:         currentSpecies + 'ª',
+        tom:             currentTonalityName,
+        dataHoraInicio:  startTimeDate.toLocaleString(),
+        dataHoraFim:     new Date().toLocaleString(),
         notaFinal,
         somaPontuacoes,
         acertos,
-        total: questions.length,
-        acertosPorTipo, 
-        totalPorTipo, 
-        acertosPorTrat, 
-        totalPorTrat,
+        total:           questions.length,
+        acertosPorTipo,
+        totalPorTipo,
         questionAttempts: [...questionAttempts],
-        questionScores: [...questionScores],
-        qtd: questions.length/3
+        questionScores:   [...questionScores]
     };
-    
-    attemptsHistory.push(reg);
-    sessionAttemptCount++;
-    saveHistory(); 
+
     generateReport(reg);
-    
-    const rb = document.getElementById('generate-report-btn'); 
+
+    const rb = document.getElementById('generate-report-btn');
     if (rb) rb.disabled = false;
+
+    const sb = document.getElementById('start-btn');
+    if (sb) sb.disabled = false;
+    const ss = document.getElementById('species-select');
+    if (ss) ss.disabled = false;
 }
-
-function msParaHHMMSS(ms) { const totalSeg = Math.floor(ms / 1000); return `${String(Math.floor(totalSeg / 3600)).padStart(2,'0')}:${String(Math.floor((totalSeg % 3600) / 60)).padStart(2,'0')}:${String(totalSeg % 60).padStart(2,'0')}`; }
-
 function generateReport(last) {
-    if (!last) last = attemptsHistory[attemptsHistory.length-1];
     if (!last) return;
-    
-    const tempoFormatado = msParaHHMMSS(last.tempoMs);
-    const todosMs = attemptsHistory.map(a => a.tempoMs);
-    const mediaMs = todosMs.reduce((a,b) => a+b,0) / todosMs.length;
-    const sorted = [...todosMs].sort((a,b)=>a-b);
-    const medianaMs = sorted[Math.floor(sorted.length/2)];
-    const tipoLabel = { a:'🔊 Auditiva (A)', b:'👁️ Análise (B)', c:'✏️ Escrita (C)' };
-    
     const rc = document.getElementById('report-content');
     if (!rc) return;
-    
+
+    const tipoLabel = { a:'🔊 Auditiva', b:'👁️ Análise', c:'✏️ Escrita' };
+    const taxaGeral = ((last.acertos / last.total) * 100).toFixed(1);
+
+    function barraProgresso(acertos, total) {
+        const pct = total > 0 ? Math.round((acertos / total) * 100) : 0;
+        const cor = pct >= 70 ? '#3a8b5a' : pct >= 40 ? '#e67e22' : '#8b3a3a';
+        return `
+            <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">
+                <div style="flex:1; background:#3a3a3a; border-radius:4px; height:14px; overflow:hidden;">
+                    <div style="width:${pct}%; background:${cor}; height:100%; border-radius:4px; transition:width 0.4s;"></div>
+                </div>
+                <span style="min-width:60px; font-size:13px; color:#ccc;">${acertos}/${total} (${pct}%)</span>
+            </div>`;
+    }
+
+    const linhasQuestoes = last.questionAttempts.map((tent, idx) => {
+        const q      = questions[idx];
+        const tipo   = q?.tipo?.toUpperCase() || '?';
+        const trat   = q?.tratamento || '?';
+        const pont   = last.questionScores[idx] || 0;
+        const ok     = pont > 0;
+        const pontTx = pont.toFixed(2);
+        return `
+            <tr style="border-bottom:1px solid #3a3a3a;">
+                <td style="padding:5px 8px; text-align:center; font-weight:bold; color:#3a6ea5;">Q${idx+1}</td>
+                <td style="padding:5px 8px; text-align:center;">${tipo}</td>
+                <td style="padding:5px 8px;">${trat}</td>
+                <td style="padding:5px 8px; text-align:center; font-size:16px;">${ok ? '✅' : '❌'}</td>
+                <td style="padding:5px 8px; text-align:center; color:#9a9a9a;">${tent}</td>
+                <td style="padding:5px 8px; text-align:center; color:${ok ? '#4da87a' : '#a84d4d'};">${pontTx}</td>
+            </tr>`;
+    }).join('');
+
     rc.innerHTML = `
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h4>📋 Dados da Tentativa</h4>
-                <p><strong>Aluno:</strong> ${last.nome}</p>
-                <p><strong>Espécie:</strong> ${last.especie}</p>
-                <p><strong>Tom:</strong> ${last.tom}</p>
-                <p><strong>Nota Final:</strong> ${last.notaFinal} / ${last.total}</p>
-                <p><strong>Acertos:</strong> ${last.acertos}/${last.total}</p>
-                <p><strong>Taxa de acerto:</strong> ${((last.acertos/last.total)*100).toFixed(1)}%</p>
-                <p><strong>Tempo:</strong> ${tempoFormatado}</p>
-                <p><strong>Início:</strong> ${last.dataHoraInicio}</p>
-                <p><strong>Fim:</strong> ${last.dataHoraFim}</p>
+        <!-- CABEÇALHO -->
+        <div style="background:#1a1a1a; border-radius:10px; padding:20px 28px; margin-bottom:20px;
+                    display:flex; flex-wrap:wrap; gap:20px; align-items:center; justify-content:space-between;
+                    border-left:5px solid #3a6ea5;">
+            <div>
+                <div style="font-size:1.5em; font-weight:bold; color:#e0e0e0;">${last.nome}</div>
+                <div style="color:#9a9a9a; margin-top:4px; font-size:13px;">
+                    ${last.especie} Espécie &nbsp;|&nbsp; Tom: ${last.tom}
+                    &nbsp;|&nbsp; Início: ${last.dataHoraInicio}
+                    &nbsp;|&nbsp; Fim: ${last.dataHoraFim}
+                </div>
             </div>
-            <div class="stat-card">
-                <h4>⏱️ Estatísticas de Tempo</h4>
-                <p><strong>Tentativas nesta sessão:</strong> ${sessionAttemptCount}</p>
-                <p><strong>Tentativas no histórico:</strong> ${attemptsHistory.length}</p>
-                <p><strong>Média:</strong> ${msParaHHMMSS(mediaMs)}</p>
-                <p><strong>Mediana:</strong> ${msParaHHMMSS(medianaMs)}</p>
+            <div style="text-align:center;">
+                <div style="font-size:3em; font-weight:bold;
+                            color:${parseFloat(taxaGeral)>=70?'#4da87a':parseFloat(taxaGeral)>=40?'#e67e22':'#a84d4d'};">
+                    ${last.notaFinal}<span style="font-size:0.45em; color:#9a9a9a;"> /10</span>
+                </div>
+                <div style="color:#9a9a9a; font-size:13px;">${last.acertos} acertos de ${last.total} &nbsp;(${taxaGeral}%)</div>
             </div>
+        </div>
+
+        <!-- LINHA 2: dois cartões lado a lado -->
+        <div style="display:grid; grid-template-columns:1fr 2fr; gap:16px; align-items:start;">
+
+            <!-- Acertos por tipo -->
             <div class="stat-card">
                 <h4>🎯 Acertos por Tipo</h4>
-                <p>${tipoLabel.a}: ${last.acertosPorTipo.a || 0}/${last.totalPorTipo.a || last.qtd}</p>
-                <p>${tipoLabel.b}: ${last.acertosPorTipo.b || 0}/${last.totalPorTipo.b || last.qtd}</p>
-                <p>${tipoLabel.c}: ${last.acertosPorTipo.c || 0}/${last.totalPorTipo.c || last.qtd}</p>
+                <div style="margin-top:12px;">
+                    <div style="margin-bottom:10px;">
+                        <span style="color:#ccc; font-size:13px;">${tipoLabel.a}</span>
+                        ${barraProgresso(last.acertosPorTipo.a||0, last.totalPorTipo.a||0)}
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <span style="color:#ccc; font-size:13px;">${tipoLabel.b}</span>
+                        ${barraProgresso(last.acertosPorTipo.b||0, last.totalPorTipo.b||0)}
+                    </div>
+                    <div>
+                        <span style="color:#ccc; font-size:13px;">${tipoLabel.c}</span>
+                        ${barraProgresso(last.acertosPorTipo.c||0, last.totalPorTipo.c||0)}
+                    </div>
+                </div>
             </div>
-            <div class="stat-card">
+
+            <!-- Detalhamento por questão -->
+            <div class="stat-card" style="padding:16px;">
                 <h4>🎼 Detalhamento por Questão</h4>
-                ${last.questionAttempts.map((tent, idx) => `
-                    <p><strong>Q${idx+1}</strong>
-                    (${questions[idx]?.tipo?.toUpperCase() || '?'} — ${questions[idx]?.tratamento?.slice(4) || '?'}):
-                    ${last.questionScores[idx] > 0 ? '✅' : '❌'}
-                    ${tent} tentativa(s) → pontuação ${last.questionScores[idx].toFixed(2)}</p>
-                `).join('')}
+                <div style="overflow-x:auto; margin-top:10px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead>
+                            <tr style="color:#3a6ea5; border-bottom:2px solid #3a6ea5;">
+                                <th style="padding:5px 8px;">#</th>
+                                <th style="padding:5px 8px;">Tipo</th>
+                                <th style="padding:5px 8px; text-align:left;">Tratamento</th>
+                                <th style="padding:5px 8px;">Resultado</th>
+                                <th style="padding:5px 8px;">Tentativas</th>
+                                <th style="padding:5px 8px;">Pontuação</th>
+                            </tr>
+                        </thead>
+                        <tbody>${linhasQuestoes}</tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
-    
-    const ra = document.getElementById('report-area'); 
+
+    const ra = document.getElementById('report-area');
     if (ra) ra.classList.add('show');
 }
-
 async function exportPDF() {
     const { jsPDF } = window.jspdf;
     const rc = document.getElementById('report-content');
@@ -2544,7 +2866,6 @@ function startExercise() {
     const ra = document.getElementById('report-area'); 
     if (ra) ra.classList.remove('show');
 }
-
 document.addEventListener('keydown', e => {
     const map = { '1':'w', '2':'h', '4':'q', '8':'8' };
     if (map[e.key]) {
@@ -2596,9 +2917,8 @@ document.querySelectorAll('button').forEach(btn => btn.addEventListener('click',
 const sb = document.getElementById('start-btn'); if (sb) sb.onclick = startExercise;
 const rb = document.getElementById('reset-btn'); if (rb) rb.onclick = () => {
     if (confirm('Deseja salvar o relatório antes de finalizar?')) {
-        exportPDF().finally(() => { sessionAttemptCount = 0; location.reload(); });
+        exportPDF().finally(() => { location.reload(); });
     } else {
-        sessionAttemptCount = 0;
         location.reload();
     }
 };
@@ -2610,18 +2930,18 @@ function updateRestButtonVisibility() {
     const restBtn = document.getElementById('rest-btn');
     const restQrBtn = document.getElementById('rest-qr-btn');
     const speciesVal = parseInt(document.getElementById('species-select')?.value || '2');
-    const show = speciesVal === 3 ? '' : 'none';
-    if (restBtn) restBtn.style.display = show;
-    if (restQrBtn) restQrBtn.style.display = show;
+    // Pausa de mínima: disponível na 3ª e na 4ª espécie (modelo S1)
+    if (restBtn) restBtn.style.display = (speciesVal === 3 || speciesVal === 4) ? '' : 'none';
+    // Pausa de semínima: apenas na 3ª espécie
+    if (restQrBtn) restQrBtn.style.display = speciesVal === 3 ? '' : 'none';
 }
 const speciesSel = document.getElementById('species-select');
 if (speciesSel) speciesSel.addEventListener('change', updateRestButtonVisibility);
 updateRestButtonVisibility();
 
-loadHistory();
 initPiano();
 setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
-console.log('✅ Sistema de Contraponto carregado - v26.04.21');
+console.log('✅ Sistema de Contraponto carregado - v26.05.1');
 </script>
 </body>
 </html>
