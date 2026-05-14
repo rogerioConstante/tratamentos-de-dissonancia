@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v26.05.1</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v27.05.2</title>
 
     <!-- BIBLIOTECAS -->
     <script src="./libs/vexflow.js"></script>
@@ -91,7 +91,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Tratamentos de Dissonância</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.05.1</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v27.05.2</div>
     </div>
 
     <div class="config-panel">
@@ -148,6 +148,7 @@
             <div class="duration-controls">
                 <button class="duration-btn" data-duration="w">𝅜 Semibreve <span class="shortcut-hint">(1)</span></button>
                 <button class="duration-btn" data-duration="h">𝅗𝅥 Mínima <span class="shortcut-hint">(2)</span></button>
+                <button class="duration-btn" data-duration="hd" id="dotted-half-btn" style="display:none;">𝅗𝅥. Mínima com Ponto <span class="shortcut-hint">(3)</span></button>
                 <button class="duration-btn" data-duration="q">♩ Semínima <span class="shortcut-hint">(4)</span></button>
                 <button class="duration-btn" data-duration="8">♪ Colcheia <span class="shortcut-hint">(8)</span></button>
                 <button class="duration-btn species3-only" data-duration="hr" id="rest-btn" style="display:none;">𝄼 Pausa Mínima <span class="shortcut-hint">(R)</span></button>
@@ -324,31 +325,34 @@ async function playScoreTone(cantus, contraponto) {
         if (!toneReady) { await initToneAdvanced(); if (!toneReady) throw new Error('Falha ao inicializar áudio'); }
 
         const now = Tone.now();
-        const durMap = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25, 'hr': 1.0, 'qr': 0.5 };
+        const durMap = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25, 'hr': 1.0, 'qr': 0.5, 'hd': 1.5 };
         const instrumentType = document.getElementById('instrument-select')?.value || 'fm';
 
-        // ── Fundir notas ligadas na 4ª espécie (prep + diss → uma nota de duração somada) ──
+        // ── Fundir notas ligadas na 4ª e 5ª espécie (prep + diss → uma nota de duração somada) ──
         function resolverLigadura(cp) {
-            if (currentSpecies !== 4 || !cp || cp.length < 2) return cp;
-            // Detectar modelo: S1 = [hr, h, h, h], S2 = [h, h, h, h]
-            const d0 = cp[0]?.duration;
+            if ((currentSpecies !== 4 && currentSpecies !== 5) || !cp || cp.length < 2) return cp;
+            const durV = { 'w':4,'h':2,'q':1,'8':0.5,'hr':2,'qr':1,'hd':3 };
+            // Detectar par prep+diss (mesma nota, posições consecutivas)
             let prepIdx = -1, dissIdx = -1;
-            if (d0 === 'hr' || d0 === 'h') { prepIdx = 1; dissIdx = 2; }
+            const rm = cp._ritmoModelo4 || cp._ritmoModelo5 || '';
+            if (rm === 's1' || rm === '5d') { prepIdx = 1; dissIdx = 2; }
+            else if (rm === 's2' || rm === '5e') { prepIdx = 1; dissIdx = 2; }
+            else if (rm === '5f') { prepIdx = 2; dissIdx = 3; }
+            else if (cp.length === 4) {
+                const d0 = cp[0]?.duration;
+                if (d0 === 'hr' || d0 === 'h') { prepIdx = 1; dissIdx = 2; }
+            }
             if (prepIdx < 0 || dissIdx >= cp.length) return cp;
-            // Só fundir se prep e diss forem a mesma nota (ligadura real)
-            const prep = cp[prepIdx];
-            const diss = cp[dissIdx];
+            const prep = cp[prepIdx]; const diss = cp[dissIdx];
             if (!prep?.note || !diss?.note || prep.note !== diss.note) return cp;
-            // Construir nova lista: substituir prep pela nota fundida, omitir diss
-            const durPrep = durMap[prep.duration] || 1;
-            const durDiss = durMap[diss.duration] || 1;
+            const durPrep = durV[prep.duration] || 2;
+            const durDiss = durV[diss.duration] || 2;
             const durFundida = durPrep + durDiss;
-            // Encontrar duration string correspondente à duração somada
-            const durStr = Object.entries(durMap).find(([k, v]) => Math.abs(v - durFundida) < 0.001)?.[0] || 'w';
+            const durStr = Object.entries(durV).find(([k,v]) => Math.abs(v-durFundida)<0.001)?.[0] || 'w';
             const resultado = [];
             for (let i = 0; i < cp.length; i++) {
                 if (i === prepIdx) resultado.push({ note: prep.note, duration: durStr });
-                else if (i === dissIdx) continue; // omitir: já fundida com prep
+                else if (i === dissIdx) continue;
                 else resultado.push(cp[i]);
             }
             return resultado;
@@ -416,13 +420,21 @@ const tratamentosPorEspecie = {
     2: ['Nota de passagem', 'Bordadura Inferior', 'Bordadura Superior', 'Sem Dissonâncias'],
     3: ['Nota de passagem', 'Bordadura', 'Cambiata', 'Bordadura dupla', 'Grupo de notas de passagem', 'Nota de passagem acentuada', 'Bordadura acentuada'],
     4: ['Suspensão', 'Retardo', 'Nota de passagem', 'Bordadura Superior', 'Bordadura Inferior'],
-    5: ['Nota de passagem', 'Bordadura', 'Cambiata', 'Bordadura dupla', 'Grupo de notas de passagem', 'Nota de passagem acentuada', 'Bordadura acentuada', 'Suspensão e retardo', 'Suspensão com resolução interrompida', 'Apojatura', 'Antecipação']
+    5: ['Nota de passagem', 'Bordadura', 'Cambiata', 'Bordadura dupla', 'Grupo de notas de passagem',
+        'Nota de passagem acentuada', 'Bordadura acentuada',
+        'Suspensão', 'Retardo',
+        'Suspensão com resolução interrompida', 'Retardo com resolução interrompida',
+        'Apojatura', 'Antecipação', 'Escapada']
 };
 const tratamentosGeraveis = {
     2: ['Nota de passagem', 'Bordadura Inferior', 'Bordadura Superior'],
     3: [...tratamentosPorEspecie[3]],
     4: ['Suspensão', 'Retardo', 'Nota de passagem', 'Bordadura Superior', 'Bordadura Inferior'],
-    5: [...tratamentosPorEspecie[5]]
+    5: ['Nota de passagem', 'Bordadura', 'Cambiata', 'Bordadura dupla', 'Grupo de notas de passagem',
+        'Nota de passagem acentuada', 'Bordadura acentuada',
+        'Suspensão', 'Retardo',
+        'Suspensão com resolução interrompida', 'Retardo com resolução interrompida',
+        'Apojatura', 'Antecipação', 'Escapada']
 };
 
 // ==================== TONALIDADES (até 5 acidentes) ====================
@@ -632,6 +644,13 @@ function gerarParValido(tratamento, isUpperVoice, maxTentativas = 20) {
                 contraponto = resultado4.notas;
                 // Fallback: se ritmoModelo não veio (caso de NP/Bordaduras), define como 'np'
                 cantus._ritmoModelo4 = resultado4.ritmoModelo || 'np';
+            }
+        } else if (currentSpecies === 5) {
+            const resultado5 = gerarContraponto5aEspecie(tratamento, cantus, isUpperVoice);
+            if (resultado5) {
+                contraponto = resultado5.notas;
+                contraponto._ritmoModelo5 = resultado5.ritmoModelo || '5c';
+                cantus._ritmoModelo5 = resultado5.ritmoModelo || '5c';
             }
         }
         if (Array.isArray(contraponto) && contraponto.length > 0) {
@@ -1935,6 +1954,8 @@ function validarRespostaEscrita(q) {
         resultado = analisarContraponto3aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || 'a');
     } else if (currentSpecies === 4) {
         resultado = analisarContraponto4aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || 'np');
+    } else if (currentSpecies === 5) {
+        resultado = analisarContraponto5aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || '5c');
     } else {
         resultado = { ok: false, erro: 'Espécie não implementada para validação escrita' };
     }
@@ -1959,7 +1980,663 @@ function validarRespostaEscrita(q) {
         questionAnswered = false;
     }
 }
-// ==================== MODELO RÍTMICO ====================
+// ==================== 5ª ESPÉCIE — GERAÇÃO ====================
+function sortearTratamento5aEspecie() {
+    // Pesos: tratamentos herdados mais frequentes; exclusivos menos frequentes
+    const pesos = [
+        ['Nota de passagem', 8], ['Bordadura', 6], ['Cambiata', 4],
+        ['Bordadura dupla', 4], ['Grupo de notas de passagem', 4],
+        ['Nota de passagem acentuada', 5], ['Bordadura acentuada', 5],
+        ['Suspensão', 6], ['Retardo', 5],
+        ['Suspensão com resolução interrompida', 4], ['Retardo com resolução interrompida', 4],
+        ['Apojatura', 5], ['Antecipação', 5], ['Escapada', 5]
+    ];
+    const total = pesos.reduce((s,[,p]) => s+p, 0);
+    let r = Math.random() * total;
+    for (const [t,p] of pesos) { r -= p; if (r <= 0) return t; }
+    return pesos[pesos.length-1][0];
+}
+
+// Mapa de ritmos para cada tratamento da 5ª espécie, com modelos possíveis
+const RITMOS_5ESP = {
+    // Herdados da 2ª/3ª espécie — modelos 5a e 5c (h. q|w e h. q|q q h)
+    'Nota de passagem':              ['5a','5c','a','b','c','d'],
+    'Bordadura':                     ['5a','5c','a','b','c','d'],
+    'Cambiata':                      ['5c','a','b','d'],
+    'Bordadura dupla':               ['5a','5c','a','b','c','d'],
+    'Grupo de notas de passagem':    ['5a','5c','a','b','c','d'],
+    'Nota de passagem acentuada':    ['5b','5c','a','b','c','d'],
+    'Bordadura acentuada':           ['5b','5c','a','b','c','d'],
+    // Herdados da 4ª espécie
+    'Suspensão':                     ['5d','5e','5f','s1','s2'],
+    'Retardo':                       ['5d','5e','5f','s1','s2'],
+    // Exclusivos da 5ª
+    'Suspensão com resolução interrompida': ['5d','5e','5f'],
+    'Retardo com resolução interrompida':   ['5d','5e','5f'],
+    'Apojatura':  ['5b','5c'],
+    'Antecipação':['5a','5c'],
+    'Escapada':   ['5a','5c'],
+};
+
+function sortearRitmoModelo5(tratamento) {
+    const modelos = RITMOS_5ESP[tratamento] || RITMO_MODELOS[tratamento] || ['5c'];
+    const totalPeso = modelos.reduce((s,m) => s + (RITMO_PESOS[m]||1), 0);
+    let r = Math.random() * totalPeso;
+    for (const m of modelos) { r -= (RITMO_PESOS[m]||1); if (r<=0) return m; }
+    return modelos[modelos.length-1];
+}
+
+function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
+    if (!cantusNotes || cantusNotes.length < 2) return null;
+    const cf1 = cantusNotes[0].note;
+    const cf2 = cantusNotes[1].note;
+    const s1 = noteToNumber(cf1);
+    const s2 = noteToNumber(cf2);
+    const cpAbaixo = isUpperVoice;
+
+    // Tratamentos herdados: delegar às funções anteriores com modelo 5a ou 5c
+    const tratamentosHerdados3 = ['Nota de passagem','Bordadura','Cambiata','Bordadura dupla',
+                                   'Grupo de notas de passagem','Nota de passagem acentuada','Bordadura acentuada'];
+    if (tratamentosHerdados3.includes(tratamento)) {
+        // Usar geração da 3ª espécie — os modelos 3ª são compatíveis
+        const notas = gerarContraponto3aEspecie(tratamento, cantusNotes, isUpperVoice);
+        if (!notas) return null;
+        return { notas, ritmoModelo: notas[0]?.duration === 'hr' ? 'b' : 'a' };
+    }
+
+    // Suspensão e Retardo normais (herdado 4ª): delegar
+    if (tratamento === 'Suspensão' || tratamento === 'Retardo') {
+        const res4 = gerarContraponto4aEspecie(tratamento, cantusNotes, isUpperVoice);
+        if (!res4) return null;
+        res4.notas._ritmoModelo5 = res4.ritmoModelo;
+        return res4;
+    }
+
+    const rangeMin = cpAbaixo ? s1 - 22 : s1 + 1;
+    const rangeMax = cpAbaixo ? s1 - 1  : s1 + 22;
+
+    function inRange(vex) {
+        const num = noteToNumber(vex);
+        return num >= rangeMin - 4 && num <= rangeMax + 4;
+    }
+    function inScale(vex) { return currentScale.includes(vex.split('/')[0]); }
+    function cons(n,cf) { return isConsonant(noteToNumber(n)-noteToNumber(cf)); }
+    function diss(n,cf) { return !cons(n,cf); }
+    function noCross(n,cf) { return !hasCruzamento(n,cf,cpAbaixo); }
+
+    // Candidatos consonantes com cf1 dentro do range
+    const cands1 = [];
+    for (let num = rangeMin; num <= rangeMax; num++) {
+        const vex = numberToNote(num);
+        if (!inScale(vex)) continue;
+        if (cons(vex,cf1)) cands1.push(vex);
+    }
+    const cands2 = [];
+    for (let num = cpAbaixo ? s2-22 : s2+1; num <= (cpAbaixo ? s2-1 : s2+22); num++) {
+        const vex = numberToNote(num);
+        if (!inScale(vex)) continue;
+        if (cons(vex,cf2)) cands2.push(vex);
+    }
+    if (cands1.length === 0 || cands2.length === 0) return null;
+    const sh1 = embaralhar([...cands1]);
+    const sh2 = embaralhar([...cands2]);
+
+    // ── Suspensão com resolução interrompida (Sri) ──
+    // n1=consLivre, n2=prep(cons cf1), n3=diss(=n2, sustentada cf2), n4=interrupção(cons cf2, salto de n3), n5=res(cons cf2, grau de n4)
+    // Modelos: 5d=[h h_ | _q q h], 5e=[hd q_ | _q q h], 5f=[h q q_ | _q q h]
+    if (tratamento === 'Suspensão com resolução interrompida' ||
+        tratamento === 'Retardo com resolução interrompida') {
+        const dirRes = tratamento === 'Suspensão com resolução interrompida' ? -1 : 1;
+        for (const prep of sh1) {
+            const prepNum = noteToNumber(prep);
+            if (!cons(prep,cf1)) continue;
+            if (!diss(prep,cf2)) continue; // prep deve ser dissonante com cf2 (é a nota sustentada)
+            // n4: interrupção consonante com cf2, alcançada por salto de n3 (=prep)
+            for (const n4 of embaralhar([...cands2])) {
+                if (!cons(n4,cf2)) continue;
+                const saltoN3N4 = Math.abs(noteToNumber(n4) - prepNum);
+                if (saltoN3N4 <= 2) continue; // deve ser salto (não grau)
+                if (!isLeapPermitido(prep,n4,null)) continue;
+                if (!noCross(n4,cf2)) continue;
+                // n5: resolução consonante, alcançada por grau de n4, continuando a resolução
+                const n5 = scaleStep(n4, dirRes);
+                if (!n5 || !inScale(n5)) continue;
+                if (!cons(n5,cf2)) continue;
+                if (!isStep(n4,n5)) continue;
+                if (!noCross(n5,cf2)) continue;
+                // Modelo rítmico: sortear 5d, 5e ou 5f
+                const rm = ['5d','5e','5f'][Math.floor(Math.random()*3)];
+                let n1cands;
+                if (rm === '5f') {
+                    // [h q q_ | _q q h]: n1=consLivre(h), n2=cons(q), n3=prep(q), n4=diss liga, n5=interrup, n6=res
+                    n1cands = embaralhar([...sh1]);
+                    for (const n1 of n1cands) {
+                        if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
+                        const n2cands = embaralhar([...sh1]);
+                        for (const n2 of n2cands) {
+                            if (!cons(n2,cf1)||!noCross(n2,cf1)) continue;
+                            if (!isLeapPermitido(n1,n2,prep)) continue;
+                            if (!isLeapPermitido(n2,prep,prep)) continue;
+                            if (noCross(prep,cf1)) {
+                                const notas = [
+                                    {note:n1,duration:'h'},{note:n2,duration:'q'},
+                                    {note:prep,duration:'q'},{note:prep,duration:'q'},
+                                    {note:n4,duration:'q'},{note:n5,duration:'h'}
+                                ];
+                                notas._ritmoModelo5 = '5f';
+                                return { notas, ritmoModelo:'5f' };
+                            }
+                        }
+                    }
+                } else if (rm === '5e') {
+                    // [hd q_ | _q q h]: n1=hd(cons cf1), n2=prep(q)=diss liga, n3=interrup, n4=res
+                    n1cands = embaralhar([...sh1]);
+                    for (const n1 of n1cands) {
+                        if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
+                        if (!isLeapPermitido(n1,prep,prep)) continue;
+                        if (noCross(prep,cf1)) {
+                            const notas = [
+                                {note:n1,duration:'hd'},{note:prep,duration:'q'},
+                                {note:prep,duration:'q'},{note:n4,duration:'q'},{note:n5,duration:'h'}
+                            ];
+                            notas._ritmoModelo5 = '5e';
+                            return { notas, ritmoModelo:'5e' };
+                        }
+                    }
+                } else {
+                    // 5d: [h h_ | _q q h]: n1=consLivre(h), n2=prep(h)=diss liga, n3=interrup, n4=res
+                    n1cands = embaralhar([...sh1]);
+                    for (const n1 of n1cands) {
+                        if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
+                        if (!isLeapPermitido(n1,prep,prep)) continue;
+                        if (noCross(prep,cf1)) {
+                            const notas = [
+                                {note:n1,duration:'h'},{note:prep,duration:'h'},
+                                {note:prep,duration:'q'},{note:n4,duration:'q'},{note:n5,duration:'h'}
+                            ];
+                            notas._ritmoModelo5 = '5d';
+                            return { notas, ritmoModelo:'5d' };
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    // ── Apojatura ──
+    // Dissonância no tempo forte (t1 do c2), alcançada por salto, resolve por grau conjunto
+    // Modelo 5b: [w | h h]  → n1=prep(w,cf1), n2=diss(h,cf2,salto de n1), n3=res(h,cf2)
+    // Modelo 5c: [hd q | q q h] → n1=consLivre(hd), n2=cons(q cf1), n3=diss(q cf2 salto), n4=res(q cf2), n5=cons(h cf2)
+    if (tratamento === 'Apojatura') {
+        // Modelo 5b
+        for (const prep of sh1) {
+            if (!cons(prep,cf1)||!noCross(prep,cf1)) continue;
+            // Diss: tempo forte c2, alcançada por salto de prep
+            for (let num = cpAbaixo?s2-22:s2+1; num<=(cpAbaixo?s2-1:s2+22); num++) {
+                const apoj = numberToNote(num);
+                if (!inScale(apoj)) continue;
+                if (cons(apoj,cf2)) continue; // deve ser dissonante
+                const salto = Math.abs(noteToNumber(apoj)-noteToNumber(prep));
+                if (salto <= 2) continue; // alcançada por salto
+                if (!isLeapPermitido(prep,apoj,null)) continue;
+                if (!noCross(apoj,cf2)) continue;
+                // Res: grau conjunto de apoj
+                for (const dir of [-1,1]) {
+                    const res = scaleStep(apoj,dir);
+                    if (!res||!inScale(res)) continue;
+                    if (!cons(res,cf2)) continue;
+                    if (!isStep(apoj,res)) continue;
+                    if (!noCross(res,cf2)) continue;
+                    const notas = [
+                        {note:prep,duration:'w'},{note:apoj,duration:'h'},{note:res,duration:'h'}
+                    ];
+                    notas._ritmoModelo5 = '5b';
+                    return { notas, ritmoModelo:'5b' };
+                }
+            }
+        }
+        // Modelo 5c: [hd q | q q h]
+        for (const n2 of sh1) {
+            if (!cons(n2,cf1)||!noCross(n2,cf1)) continue;
+            for (const n1 of embaralhar([...sh1])) {
+                if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
+                if (!isLeapPermitido(n1,n2,n2)) continue;
+                // n3=apojatura: diss com cf2, salto de n2
+                for (let num = cpAbaixo?s2-22:s2+1; num<=(cpAbaixo?s2-1:s2+22); num++) {
+                    const apoj = numberToNote(num);
+                    if (!inScale(apoj)) continue;
+                    if (cons(apoj,cf2)) continue;
+                    const salto = Math.abs(noteToNumber(apoj)-noteToNumber(n2));
+                    if (salto<=2) continue;
+                    if (!isLeapPermitido(n2,apoj,null)) continue;
+                    if (!noCross(apoj,cf2)) continue;
+                    for (const dir of [-1,1]) {
+                        const res = scaleStep(apoj,dir);
+                        if (!res||!inScale(res)) continue;
+                        if (!cons(res,cf2)) continue;
+                        if (!isStep(apoj,res)) continue;
+                        if (!noCross(res,cf2)) continue;
+                        for (const n5 of embaralhar([...sh2])) {
+                            if (!cons(n5,cf2)||!noCross(n5,cf2)) continue;
+                            if (!isLeapPermitido(res,n5,null)) continue;
+                            const notas = [
+                                {note:n1,duration:'hd'},{note:n2,duration:'q'},
+                                {note:apoj,duration:'q'},{note:res,duration:'q'},{note:n5,duration:'h'}
+                            ];
+                            notas._ritmoModelo5 = '5c';
+                            return { notas, ritmoModelo:'5c' };
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    // ── Antecipação ──
+    // Dissonância no tempo fraco (q), antecipando a nota do tempo forte seguinte
+    // n_ant: dissonante com cf atual, mas igual à resolução (consonante com cf seguinte)
+    // Modelo 5a: [hd q | w] → n1=consLivre(hd cf1), n2=ant(q cf1 diss, mas = res), n3=res(w cf2 cons = n2)
+    // Modelo 5c: [hd q | q q h] → n1=consLivre(hd), n2=ant(q cf1 diss), n3=res(q cf2 cons=n2), n4=cons(q), n5=cons(h)
+    if (tratamento === 'Antecipação') {
+        // Modelo 5a
+        for (const n3 of sh2) { // n3 = resolução = semibreve, cons cf2
+            if (!cons(n3,cf2)||!noCross(n3,cf2)) continue;
+            // n2 = antecipação: igual a n3, deve ser dissonante com cf1
+            if (!diss(n3,cf1)) continue; // antecipação é dissonância com cf1
+            const ant = n3;
+            for (const n1 of embaralhar([...sh1])) {
+                if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
+                if (!isLeapPermitido(n1,ant,n3)) continue;
+                if (!noCross(ant,cf1)) continue;
+                const notas = [
+                    {note:n1,duration:'hd'},{note:ant,duration:'q'},{note:n3,duration:'w'}
+                ];
+                notas._ritmoModelo5 = '5a';
+                return { notas, ritmoModelo:'5a' };
+            }
+        }
+        // Modelo 5c
+        for (const n3 of sh2) {
+            if (!cons(n3,cf2)||!noCross(n3,cf2)) continue;
+            if (!diss(n3,cf1)) continue;
+            const ant = n3;
+            for (const n1 of embaralhar([...sh1])) {
+                if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
+                if (!isLeapPermitido(n1,ant,n3)) continue;
+                if (!noCross(ant,cf1)) continue;
+                for (const n4 of embaralhar([...sh2])) {
+                    if (!cons(n4,cf2)||!noCross(n4,cf2)) continue;
+                    if (!isLeapPermitido(n3,n4,null)) continue;
+                    for (const n5 of embaralhar([...sh2])) {
+                        if (!cons(n5,cf2)||!noCross(n5,cf2)) continue;
+                        if (!isLeapPermitido(n4,n5,null)) continue;
+                        const notas = [
+                            {note:n1,duration:'hd'},{note:ant,duration:'q'},
+                            {note:n3,duration:'q'},{note:n4,duration:'q'},{note:n5,duration:'h'}
+                        ];
+                        notas._ritmoModelo5 = '5c';
+                        return { notas, ritmoModelo:'5c' };
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    // ── Escapada ──
+    // n1=prep(cons cf1), n2=diss(grau de n1, tempo fraco cf1), n3=res(salto de 3ª, direção oposta, cons cf2)
+    // Modelo 5a: [hd q | w] → n1=consLivre(hd), n2=esc(q diss cf1), n3=res(w cons cf2)
+    // Modelo 5c: [hd q | q q h] → n1=consLivre(hd), n2=esc(q diss cf1), n3=res(q cons cf2), n4,n5=cons
+    if (tratamento === 'Escapada') {
+        for (const n1 of sh1) {
+            if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
+            // n2: diss com cf1, alcançada por grau de n1
+            for (const dir of [-1,1]) {
+                const n2 = scaleStep(n1,dir);
+                if (!n2||!inScale(n2)) continue;
+                if (!isStep(n1,n2)) continue;
+                if (cons(n2,cf1)) continue; // deve ser dissonante
+                if (!noCross(n2,cf1)) continue;
+                // n3: cons com cf2, salto de 3ª na direção oposta de n1→n2
+                const dirOposta = -dir;
+                for (const n3 of embaralhar([...sh2])) {
+                    if (!cons(n3,cf2)||!noCross(n3,cf2)) continue;
+                    const salto = noteToNumber(n3)-noteToNumber(n2);
+                    if (Math.sign(salto) !== dirOposta) continue;
+                    if (!isThird(n2,n3)) continue; // preferencialmente terça
+                    // Modelo 5a
+                    const notas5a = [
+                        {note:n1,duration:'hd'},{note:n2,duration:'q'},{note:n3,duration:'w'}
+                    ];
+                    notas5a._ritmoModelo5 = '5a';
+                    return { notas: notas5a, ritmoModelo:'5a' };
+                }
+                // Fallback: qualquer salto consonante na direção oposta
+                for (const n3 of embaralhar([...sh2])) {
+                    if (!cons(n3,cf2)||!noCross(n3,cf2)) continue;
+                    const salto = noteToNumber(n3)-noteToNumber(n2);
+                    if (Math.sign(salto) !== dirOposta) continue;
+                    if (isStep(n2,n3)) continue; // não pode ser grau — deve ser salto
+                    if (!isLeapPermitido(n2,n3,null)) continue;
+                    const notas5a = [
+                        {note:n1,duration:'hd'},{note:n2,duration:'q'},{note:n3,duration:'w'}
+                    ];
+                    notas5a._ritmoModelo5 = '5a';
+                    return { notas: notas5a, ritmoModelo:'5a' };
+                }
+            }
+        }
+        return null;
+    }
+
+    return null;
+}
+
+// ==================== 5ª ESPÉCIE — ANÁLISE ====================
+function analisarContraponto5aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo) {
+    const cf1 = cantus[0].note;
+    const cf2 = cantus[1].note;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    const diss = (n,cf) => !cons(n,cf);
+
+    const d = userCP.map(n => n.duration);
+    const len = userCP.length;
+
+    // ── Tratamentos herdados: redirecionar para analisadores existentes ──
+    const trats3 = ['Nota de passagem','Bordadura','Cambiata','Bordadura dupla',
+                    'Grupo de notas de passagem','Nota de passagem acentuada','Bordadura acentuada'];
+    if (trats3.includes(tratamentoEsperado)) {
+        // Inferir ritmoModelo da 3ª espécie a partir das durações inseridas
+        let fmt3;
+        if (d[0]==='q'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='w'&&len===5) fmt3='a';
+        else if (d[0]==='hr'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='q'&&d[5]==='h'&&len===6) fmt3='b';
+        else if (d[0]==='qr'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='w'&&len===5) fmt3='c';
+        else if (d[0]==='qr'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='q'&&d[5]==='q'&&d[6]==='h'&&len===7) fmt3='d';
+        // Formatos 5a/5c compatíveis com lógica 3ª
+        else if (d[0]==='hd'&&d[1]==='q'&&d[2]==='w'&&len===3) fmt3='a'; // 5a ~ 3 notas, tratar como modelo simplificado
+        else if (d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h'&&len===5) fmt3='a';
+        else return { ok:false, erro:`5ª espécie (${tratamentoEsperado}): formato rítmico não reconhecido` };
+        return analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, fmt3);
+    }
+
+    if (tratamentoEsperado === 'Suspensão' || tratamentoEsperado === 'Retardo') {
+        // Inferir modelo s1/s2 das durações
+        let rm4;
+        if (len===4&&d[0]==='hr'&&d[1]==='h'&&d[2]==='h'&&d[3]==='h') rm4='s1';
+        else if (len===4&&d[0]==='h'&&d[1]==='h'&&d[2]==='h'&&d[3]==='h') rm4='s2';
+        // Modelos 5d/5e/5f também aceitos para S/R normais
+        else if (len===5&&d[0]==='h'&&d[1]==='h'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') rm4='5d_sr';
+        else if (len===5&&d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') rm4='5e_sr';
+        else if (len===6&&d[0]==='h'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='q'&&d[5]==='h') rm4='5f_sr';
+        else return { ok:false, erro:`Suspensão/Retardo: formato rítmico não reconhecido. Use 𝅗𝅥 𝅗𝅥— ou variantes da 5ª espécie` };
+        if (rm4==='s1'||rm4==='s2') return analisarContraponto4aEspecie(userCP,cantus,tratamentoEsperado,rm4);
+        // Para modelos 5d/5e/5f: validar prep+diss ligados normalmente
+        return analisarSR5esp(userCP,cantus,tratamentoEsperado,rm4);
+    }
+
+    // ── Sri / Rri ──
+    if (tratamentoEsperado === 'Suspensão com resolução interrompida' ||
+        tratamentoEsperado === 'Retardo com resolução interrompida') {
+        const dirEsp = tratamentoEsperado.startsWith('Suspensão') ? -1 : 1;
+        // Formatos: 5d=[h,h,q,q,h], 5e=[hd,q,q,q,h], 5f=[h,q,q,q,q,h]
+        let fmt5;
+        if (len===5&&d[0]==='h'&&d[1]==='h'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') fmt5='5d';
+        else if (len===5&&d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') fmt5='5e';
+        else if (len===6&&d[0]==='h'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='q'&&d[5]==='h') fmt5='5f';
+        else return { ok:false, erro:`Sri/Rri: formato rítmico incorreto. Use 𝅗𝅥 𝅗𝅥—|—♩ ♩ 𝅗𝅥 (ou variante)` };
+        return analisarSriRri(userCP,cantus,tratamentoEsperado,fmt5,dirEsp);
+    }
+
+    // ── Apojatura ──
+    if (tratamentoEsperado === 'Apojatura') {
+        let fmt5;
+        if (len===3&&d[0]==='w'&&d[1]==='h'&&d[2]==='h') fmt5='5b';
+        else if (len===5&&d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') fmt5='5c';
+        else return { ok:false, erro:`Apojatura: use 𝅜 | 𝅗𝅥 𝅗𝅥 ou 𝅗𝅥. ♩ | ♩ ♩ 𝅗𝅥` };
+        return analisarApojatura(userCP,cantus,fmt5);
+    }
+
+    // ── Antecipação ──
+    if (tratamentoEsperado === 'Antecipação') {
+        let fmt5;
+        if (len===3&&d[0]==='hd'&&d[1]==='q'&&d[2]==='w') fmt5='5a';
+        else if (len===5&&d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') fmt5='5c';
+        else return { ok:false, erro:`Antecipação: use 𝅗𝅥. ♩ | 𝅜 ou 𝅗𝅥. ♩ | ♩ ♩ 𝅗𝅥` };
+        return analisarAntecipacao(userCP,cantus,fmt5);
+    }
+
+    // ── Escapada ──
+    if (tratamentoEsperado === 'Escapada') {
+        let fmt5;
+        if (len===3&&d[0]==='hd'&&d[1]==='q'&&d[2]==='w') fmt5='5a';
+        else if (len===5&&d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') fmt5='5c';
+        else return { ok:false, erro:`Escapada: use 𝅗𝅥. ♩ | 𝅜 ou 𝅗𝅥. ♩ | ♩ ♩ 𝅗𝅥` };
+        return analisarEscapada(userCP,cantus,fmt5);
+    }
+
+    return { ok:false, erro:'Tratamento não reconhecido para a 5ª espécie' };
+}
+
+// Análise de S/R nos modelos 5d/5e/5f (resolução simples, sem interrupção)
+function analisarSR5esp(userCP, cantus, tratamento, rm) {
+    const cf1 = cantus[0].note, cf2 = cantus[1].note;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    const diss = (n,cf) => !cons(n,cf);
+    const resolvDown = tratamento === 'Suspensão';
+
+    // 5d: [n1=consLivre(h), n2=prep(h), n3=diss(=n2 ligado)(q), n4=res(q), n5=cons(h)]
+    // 5e: [n1=consLivre(hd), n2=prep(q), n3=diss(=n2)(q), n4=res(q), n5=cons(h)]
+    // 5f: [n1=cl(h), n2=cl(q), n3=prep(q), n4=diss(=n3)(q), n5=res(q), n6=cons(h)]
+    if (rm==='5d_sr') {
+        const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:'5d S/R: n1 deve ser consonante com CF1'};
+        if (!cons(n2,cf1)) return {ok:false,erro:'5d S/R: preparação (n2) deve ser consonante com CF1'};
+        if (noteToNumber(n2)!==noteToNumber(n3)) return {ok:false,erro:'5d S/R: n3 deve ser a mesma nota que n2 (ligada)'};
+        if (!diss(n3,cf2)) return {ok:false,erro:'5d S/R: n3 (ligada) deve ser dissonante com CF2'};
+        if (!cons(n4,cf2)) return {ok:false,erro:'5d S/R: resolução (n4) deve ser consonante com CF2'};
+        if (!cons(n5,cf2)) return {ok:false,erro:'5d S/R: n5 deve ser consonante com CF2'};
+        if (!isStep(n3,n4)) return {ok:false,erro:'5d S/R: resolução deve ser por grau'};
+        const dir=Math.sign(noteToNumber(n4)-noteToNumber(n3));
+        if(resolvDown&&dir!==-1) return {ok:false,erro:'Suspensão: resolução deve descer'};
+        if(!resolvDown&&dir!==1) return {ok:false,erro:'Retardo: resolução deve subir'};
+        return {ok:true};
+    }
+    if (rm==='5e_sr') {
+        const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:'5e S/R: n1 deve ser consonante com CF1'};
+        if (!cons(n2,cf1)) return {ok:false,erro:'5e S/R: preparação (n2) deve ser consonante com CF1'};
+        if (noteToNumber(n2)!==noteToNumber(n3)) return {ok:false,erro:'5e S/R: n3 deve ser a mesma nota que n2 (ligada)'};
+        if (!diss(n3,cf2)) return {ok:false,erro:'5e S/R: n3 deve ser dissonante com CF2'};
+        if (!cons(n4,cf2)) return {ok:false,erro:'5e S/R: resolução deve ser consonante com CF2'};
+        if (!cons(n5,cf2)) return {ok:false,erro:'5e S/R: n5 deve ser consonante com CF2'};
+        if (!isStep(n3,n4)) return {ok:false,erro:'5e S/R: resolução deve ser por grau'};
+        const dir=Math.sign(noteToNumber(n4)-noteToNumber(n3));
+        if(resolvDown&&dir!==-1) return {ok:false,erro:'Suspensão: resolução deve descer'};
+        if(!resolvDown&&dir!==1) return {ok:false,erro:'Retardo: resolução deve subir'};
+        return {ok:true};
+    }
+    if (rm==='5f_sr') {
+        const [n1,n2,n3,n4,n5,n6] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:'5f S/R: n1 deve ser consonante com CF1'};
+        if (!cons(n2,cf1)) return {ok:false,erro:'5f S/R: n2 deve ser consonante com CF1'};
+        if (!cons(n3,cf1)) return {ok:false,erro:'5f S/R: preparação (n3) deve ser consonante com CF1'};
+        if (noteToNumber(n3)!==noteToNumber(n4)) return {ok:false,erro:'5f S/R: n4 deve ser a mesma nota que n3 (ligada)'};
+        if (!diss(n4,cf2)) return {ok:false,erro:'5f S/R: n4 deve ser dissonante com CF2'};
+        if (!cons(n5,cf2)) return {ok:false,erro:'5f S/R: resolução (n5) deve ser consonante com CF2'};
+        if (!cons(n6,cf2)) return {ok:false,erro:'5f S/R: n6 deve ser consonante com CF2'};
+        if (!isStep(n4,n5)) return {ok:false,erro:'5f S/R: resolução deve ser por grau'};
+        const dir=Math.sign(noteToNumber(n5)-noteToNumber(n4));
+        if(resolvDown&&dir!==-1) return {ok:false,erro:'Suspensão: resolução deve descer'};
+        if(!resolvDown&&dir!==1) return {ok:false,erro:'Retardo: resolução deve subir'};
+        return {ok:true};
+    }
+    return {ok:false,erro:'Modelo não reconhecido'};
+}
+
+// Análise Sri/Rri
+function analisarSriRri(userCP, cantus, tratamento, fmt5, dirEsp) {
+    const cf1 = cantus[0].note, cf2 = cantus[1].note;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    const diss = (n,cf) => !cons(n,cf);
+    // Sri: [n1=cl, n2=prep, n3=diss(=n2 ligado), n4=interrupção cons, n5=res cons]
+    // A resolução (n5) é alcançada por grau conjunto a partir de n3 (não de n4)
+    const label = tratamento.startsWith('Suspensão') ? 'Sri' : 'Rri';
+
+    if (fmt5==='5d') {
+        // [h, h_, _q, q, h] → notas: n1(h cf1), n2(h cf1 prep), n3(q cf2 diss=n2), n4(q cf2 interrup cons), n5(h cf2 res cons)
+        const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:`${label} 5d: n1 deve ser consonante com CF1`};
+        if (!cons(n2,cf1)) return {ok:false,erro:`${label} 5d: preparação (n2) deve ser consonante com CF1`};
+        if (noteToNumber(n2)!==noteToNumber(n3)) return {ok:false,erro:`${label} 5d: n3 deve ser a mesma nota que n2 (ligada por barra)`};
+        if (!diss(n3,cf2)) return {ok:false,erro:`${label} 5d: n3 (sustentada) deve ser dissonante com CF2`};
+        if (!cons(n4,cf2)) return {ok:false,erro:`${label} 5d: interrupção (n4) deve ser consonante com CF2`};
+        if (isStep(n3,n4)) return {ok:false,erro:`${label} 5d: n4 (interrupção) deve ser alcançada por salto a partir de n3`};
+        if (!cons(n5,cf2)) return {ok:false,erro:`${label} 5d: resolução (n5) deve ser consonante com CF2`};
+        if (!isStep(n3,n5)) return {ok:false,erro:`${label} 5d: resolução (n5) deve ser por grau conjunto a partir da dissonância (n3), não de n4`};
+        const dir=Math.sign(noteToNumber(n5)-noteToNumber(n3));
+        if(dirEsp===-1&&dir!==dirEsp) return {ok:false,erro:`Sri: resolução deve descer a partir da dissonância`};
+        if(dirEsp===1&&dir!==dirEsp) return {ok:false,erro:`Rri: resolução deve subir a partir da dissonância`};
+        return {ok:true};
+    }
+    if (fmt5==='5e') {
+        // [hd, q_, _q, q, h]
+        const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:`${label} 5e: n1 deve ser consonante com CF1`};
+        if (!cons(n2,cf1)) return {ok:false,erro:`${label} 5e: preparação (n2) deve ser consonante com CF1`};
+        if (noteToNumber(n2)!==noteToNumber(n3)) return {ok:false,erro:`${label} 5e: n3 deve ser a mesma nota que n2 (ligada)`};
+        if (!diss(n3,cf2)) return {ok:false,erro:`${label} 5e: n3 deve ser dissonante com CF2`};
+        if (!cons(n4,cf2)) return {ok:false,erro:`${label} 5e: interrupção (n4) deve ser consonante com CF2`};
+        if (isStep(n3,n4)) return {ok:false,erro:`${label} 5e: n4 deve ser alcançada por salto a partir de n3`};
+        if (!cons(n5,cf2)) return {ok:false,erro:`${label} 5e: resolução (n5) deve ser consonante com CF2`};
+        if (!isStep(n3,n5)) return {ok:false,erro:`${label} 5e: resolução (n5) deve ser por grau a partir de n3`};
+        const dir=Math.sign(noteToNumber(n5)-noteToNumber(n3));
+        if(dirEsp===-1&&dir!==dirEsp) return {ok:false,erro:`Sri: resolução deve descer`};
+        if(dirEsp===1&&dir!==dirEsp) return {ok:false,erro:`Rri: resolução deve subir`};
+        return {ok:true};
+    }
+    if (fmt5==='5f') {
+        // [h, q, q_, _q, q, h]
+        const [n1,n2,n3,n4,n5,n6] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:`${label} 5f: n1 deve ser consonante com CF1`};
+        if (!cons(n2,cf1)) return {ok:false,erro:`${label} 5f: n2 deve ser consonante com CF1`};
+        if (!cons(n3,cf1)) return {ok:false,erro:`${label} 5f: preparação (n3) deve ser consonante com CF1`};
+        if (noteToNumber(n3)!==noteToNumber(n4)) return {ok:false,erro:`${label} 5f: n4 deve ser a mesma nota que n3 (ligada)`};
+        if (!diss(n4,cf2)) return {ok:false,erro:`${label} 5f: n4 deve ser dissonante com CF2`};
+        if (!cons(n5,cf2)) return {ok:false,erro:`${label} 5f: interrupção (n5) deve ser consonante com CF2`};
+        if (isStep(n4,n5)) return {ok:false,erro:`${label} 5f: n5 deve ser alcançada por salto a partir de n4`};
+        if (!cons(n6,cf2)) return {ok:false,erro:`${label} 5f: resolução (n6) deve ser consonante com CF2`};
+        if (!isStep(n4,n6)) return {ok:false,erro:`${label} 5f: resolução (n6) deve ser por grau a partir de n4 (dissonância)`};
+        const dir=Math.sign(noteToNumber(n6)-noteToNumber(n4));
+        if(dirEsp===-1&&dir!==dirEsp) return {ok:false,erro:`Sri: resolução deve descer`};
+        if(dirEsp===1&&dir!==dirEsp) return {ok:false,erro:`Rri: resolução deve subir`};
+        return {ok:true};
+    }
+    return {ok:false,erro:'Formato não reconhecido'};
+}
+
+// Análise Apojatura
+function analisarApojatura(userCP, cantus, fmt5) {
+    const cf1 = cantus[0].note, cf2 = cantus[1].note;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    const diss = (n,cf) => !cons(n,cf);
+
+    if (fmt5==='5b') {
+        // [w, h, h]: n1=prep(w cons cf1), n2=apoj(h diss cf2 salto de n1), n3=res(h cons cf2 grau de n2)
+        const [n1,n2,n3] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:'Apojatura 5b: n1 (semibreve) deve ser consonante com CF1'};
+        if (!diss(n2,cf2)) return {ok:false,erro:'Apojatura 5b: n2 deve ser dissonante com CF2 (tempo forte)'};
+        if (isStep(n1,n2)) return {ok:false,erro:'Apojatura 5b: n2 deve ser alcançada por salto (não por grau)'};
+        if (!isLeapPermitido(n1,n2,n3)) return {ok:false,erro:'Apojatura 5b: salto n1→n2 excede uma 5ª sem compensação'};
+        if (!cons(n3,cf2)) return {ok:false,erro:'Apojatura 5b: resolução (n3) deve ser consonante com CF2'};
+        if (!isStep(n2,n3)) return {ok:false,erro:'Apojatura 5b: resolução deve ser por grau conjunto'};
+        return {ok:true};
+    }
+    if (fmt5==='5c') {
+        // [hd, q, q, q, h]: n1=cl(hd cf1), n2=cl(q cf1), n3=apoj(q diss cf2 salto), n4=res(q cons cf2), n5=cl(h cf2)
+        const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:'Apojatura 5c: n1 deve ser consonante com CF1'};
+        if (!cons(n2,cf1)) return {ok:false,erro:'Apojatura 5c: n2 deve ser consonante com CF1'};
+        if (!diss(n3,cf2)) return {ok:false,erro:'Apojatura 5c: n3 deve ser dissonante com CF2 (tempo forte)'};
+        if (isStep(n2,n3)) return {ok:false,erro:'Apojatura 5c: n3 deve ser alcançada por salto de n2'};
+        if (!isLeapPermitido(n2,n3,n4)) return {ok:false,erro:'Apojatura 5c: salto n2→n3 excede uma 5ª sem compensação'};
+        if (!cons(n4,cf2)) return {ok:false,erro:'Apojatura 5c: resolução (n4) deve ser consonante com CF2'};
+        if (!isStep(n3,n4)) return {ok:false,erro:'Apojatura 5c: resolução deve ser por grau conjunto'};
+        if (!cons(n5,cf2)) return {ok:false,erro:'Apojatura 5c: n5 deve ser consonante com CF2'};
+        return {ok:true};
+    }
+    return {ok:false,erro:'Formato não reconhecido'};
+}
+
+// Análise Antecipação
+function analisarAntecipacao(userCP, cantus, fmt5) {
+    const cf1 = cantus[0].note, cf2 = cantus[1].note;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    const diss = (n,cf) => !cons(n,cf);
+
+    if (fmt5==='5a') {
+        // [hd, q, w]: n1=cl(hd cons cf1), n2=ant(q diss cf1), n3=res(w cons cf2 = n2)
+        const [n1,n2,n3] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:'Antecipação 5a: n1 deve ser consonante com CF1'};
+        if (!diss(n2,cf1)) return {ok:false,erro:'Antecipação 5a: n2 (antecipação) deve ser dissonante com CF1'};
+        if (!cons(n3,cf2)) return {ok:false,erro:'Antecipação 5a: n3 (resolução) deve ser consonante com CF2'};
+        if (noteToNumber(n2)!==noteToNumber(n3)) return {ok:false,erro:'Antecipação 5a: a antecipação (n2) deve ser a mesma nota da resolução (n3)'};
+        return {ok:true};
+    }
+    if (fmt5==='5c') {
+        // [hd, q, q, q, h]: n1=cl(hd cf1), n2=ant(q diss cf1), n3=res(q cons cf2=n2), n4=cl(q cf2), n5=cl(h cf2)
+        const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:'Antecipação 5c: n1 deve ser consonante com CF1'};
+        if (!diss(n2,cf1)) return {ok:false,erro:'Antecipação 5c: n2 (antecipação) deve ser dissonante com CF1'};
+        if (!cons(n3,cf2)) return {ok:false,erro:'Antecipação 5c: n3 deve ser consonante com CF2'};
+        if (noteToNumber(n2)!==noteToNumber(n3)) return {ok:false,erro:'Antecipação 5c: a antecipação (n2) deve ser a mesma nota da resolução (n3)'};
+        if (!cons(n4,cf2)) return {ok:false,erro:'Antecipação 5c: n4 deve ser consonante com CF2'};
+        if (!cons(n5,cf2)) return {ok:false,erro:'Antecipação 5c: n5 deve ser consonante com CF2'};
+        return {ok:true};
+    }
+    return {ok:false,erro:'Formato não reconhecido'};
+}
+
+// Análise Escapada
+function analisarEscapada(userCP, cantus, fmt5) {
+    const cf1 = cantus[0].note, cf2 = cantus[1].note;
+    const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
+    const diss = (n,cf) => !cons(n,cf);
+
+    if (fmt5==='5a') {
+        // [hd, q, w]: n1=prep(hd cons cf1), n2=esc(q diss cf1 grau de n1), n3=res(w cons cf2 salto de n2 dir oposta)
+        const [n1,n2,n3] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:'Escapada 5a: n1 deve ser consonante com CF1'};
+        if (!diss(n2,cf1)) return {ok:false,erro:'Escapada 5a: n2 deve ser dissonante com CF1 (escapada)'};
+        if (!isStep(n1,n2)) return {ok:false,erro:'Escapada 5a: n2 deve ser alcançada por grau conjunto de n1'};
+        if (!cons(n3,cf2)) return {ok:false,erro:'Escapada 5a: resolução (n3) deve ser consonante com CF2'};
+        if (isStep(n2,n3)) return {ok:false,erro:'Escapada 5a: resolução deve ser por salto (não por grau)'};
+        const dir12 = Math.sign(noteToNumber(n2)-noteToNumber(n1));
+        const dir23 = Math.sign(noteToNumber(n3)-noteToNumber(n2));
+        if (dir12===dir23) return {ok:false,erro:'Escapada 5a: o salto de resolução deve ir na direção oposta ao movimento inicial'};
+        if (!isLeapPermitido(n2,n3,null)) return {ok:false,erro:'Escapada 5a: salto de resolução excede uma 5ª'};
+        return {ok:true};
+    }
+    if (fmt5==='5c') {
+        // [hd, q, q, q, h]: n1=cl(hd cf1), n2=esc(q diss cf1 grau), n3=res(q cons cf2 salto oposto), n4,n5=cons
+        const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
+        if (!cons(n1,cf1)) return {ok:false,erro:'Escapada 5c: n1 deve ser consonante com CF1'};
+        if (!diss(n2,cf1)) return {ok:false,erro:'Escapada 5c: n2 deve ser dissonante com CF1 (escapada)'};
+        if (!isStep(n1,n2)) return {ok:false,erro:'Escapada 5c: n2 deve ser alcançada por grau de n1'};
+        if (!cons(n3,cf2)) return {ok:false,erro:'Escapada 5c: resolução (n3) deve ser consonante com CF2'};
+        if (isStep(n2,n3)) return {ok:false,erro:'Escapada 5c: resolução deve ser por salto'};
+        const dir12 = Math.sign(noteToNumber(n2)-noteToNumber(n1));
+        const dir23 = Math.sign(noteToNumber(n3)-noteToNumber(n2));
+        if (dir12===dir23) return {ok:false,erro:'Escapada 5c: o salto de resolução deve ser na direção oposta ao movimento inicial'};
+        if (!isLeapPermitido(n2,n3,n4)) return {ok:false,erro:'Escapada 5c: salto de resolução excede uma 5ª sem compensação'};
+        if (!cons(n4,cf2)) return {ok:false,erro:'Escapada 5c: n4 deve ser consonante com CF2'};
+        if (!cons(n5,cf2)) return {ok:false,erro:'Escapada 5c: n5 deve ser consonante com CF2'};
+        return {ok:true};
+    }
+    return {ok:false,erro:'Formato não reconhecido'};
+}
+
 const RITMO_MODELOS = {
     // 3ª espécie
     'Nota de passagem':        ['a','b','c','d'],
@@ -1974,8 +2651,16 @@ const RITMO_MODELOS = {
     'Retardo':                 ['s1','s2'],
     'Bordadura Superior':      ['np'],
     'Bordadura Inferior':      ['np'],
+    // 5ª espécie — tratamentos herdados das espécies anteriores usam modelos acima
+    // 5ª espécie — tratamentos exclusivos
+    'Suspensão com resolução interrompida': ['5d','5e','5f'],
+    'Retardo com resolução interrompida':   ['5d','5e','5f'],
+    'Apojatura':    ['5b','5c'],
+    'Antecipação':  ['5a','5c'],
+    'Escapada':     ['5a','5c'],
 };
-const RITMO_PESOS = { 'a':4, 'b':3, 'c':2, 'd':1, 's1':1, 's2':1, 'np':1 };
+const RITMO_PESOS = { 'a':4, 'b':3, 'c':2, 'd':1, 's1':1, 's2':1, 'np':1,
+                      '5a':2, '5b':2, '5c':3, '5d':2, '5e':2, '5f':1 };
 
 function sortearRitmoModelo(tratamento) {
     const modelos = RITMO_MODELOS[tratamento] || ['a'];
@@ -1996,12 +2681,41 @@ const RITMO_DISPLAY = {
     's1': '𝄼 𝅗𝅥—|—𝅗𝅥 𝅗𝅥',
     's2': '𝅗𝅥 𝅗𝅥—|—𝅗𝅥 𝅗𝅥',
     'np': '𝅗𝅥 𝅗𝅥 | 𝅜',
+    // 5ª espécie
+    '5a': '𝅗𝅥. ♩ | 𝅜',
+    '5b': '𝅜 | 𝅗𝅥 𝅗𝅥',
+    '5c': '𝅗𝅥. ♩ | ♩ ♩ 𝅗𝅥',
+    '5d': '𝅗𝅥 𝅗𝅥—|—♩ ♩ 𝅗𝅥',
+    '5e': '𝅗𝅥. ♩—|—♩ ♩ 𝅗𝅥',
+    '5f': '𝅗𝅥 ♩ ♩—|—♩ ♩ 𝅗𝅥',
 };
+// function gerarInstrucao5aEspecie(tratamento, rm) {
+//     const rmDisplay = RITMO_DISPLAY[rm] || rm;
+//     const instrucoes = {
+//         'Nota de passagem': 'Dissonância no tempo fraco, movimento por grau conjunto na mesma direção.',
+//         'Bordadura': 'Dissonância no tempo fraco, volta à nota de preparação.',
+//         'Cambiata': 'Padrão: grau → salto de 3ª → grau oposto → grau (mesmo dir.).',
+//         'Bordadura dupla': 'Bordadura superior e inferior em torno da mesma nota de preparação.',
+//         'Grupo de notas de passagem': 'Três notas por grau na mesma direção entre duas consonâncias.',
+//         'Nota de passagem acentuada': 'Dissonância no tempo forte, alcançada e resolvida por grau na mesma direção.',
+//         'Bordadura acentuada': 'Dissonância no tempo forte, volta à nota de preparação.',
+//         'Suspensão': 'Prepare no c1, sustente ligada como diss. no c2, resolva por grau descendente.',
+//         'Retardo': 'Prepare no c1, sustente ligada como diss. no c2, resolva por grau ascendente.',
+//         'Suspensão com resolução interrompida': 'Prepare e sustente; a resolução descendente é interrompida por salto consonante, depois retoma o grau descendente.',
+//         'Retardo com resolução interrompida': 'Prepare e sustente; a resolução ascendente é interrompida por salto consonante, depois retoma o grau ascendente.',
+//         'Apojatura': 'Dissonância no tempo forte alcançada por <strong>salto</strong>; resolve por grau conjunto.',
+//         'Antecipação': 'A nota do próximo tempo forte é antecipada como dissonância no tempo fraco e repetida consonante.',
+//         'Escapada': 'Dissonância no tempo fraco por grau; resolve no tempo forte por <strong>salto</strong> na direção oposta.',
+//     };
+//     return instrucoes[tratamento] || '';
+// }
 // ==================== GERAÇÃO DE QUESTÕES ====================
 function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
     const tratamentos = [...tratamentosPorEspecie[currentSpecies]];
     const tratamentosParaGerar = currentSpecies === 4
         ? Array.from({length: qtdA + qtdB + qtdC}, () => sortearTratamento4aEspecie())
+        : currentSpecies === 5
+        ? Array.from({length: qtdA + qtdB + qtdC}, () => sortearTratamento5aEspecie())
         : embaralhar([...tratamentosGeraveis[currentSpecies]]);
     const tipoA = [], tipoB = [], tipoC = [];
     const assinaturasUsadas = new Set();
@@ -2106,6 +2820,11 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
                 instrucao4 = `Use a estrutura: <strong>${ritmoStr4}</strong>.`;
             }
             enunciado3 = `Escreva um contraponto de 4ª espécie com o tratamento <strong>"${tratamentoC}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; letter-spacing: 6px;">${ritmoStr4}</span><br>`;
+        } else if (currentSpecies === 5) {
+            ritmoModelo3 = sortearRitmoModelo5(tratamentoC);
+            const ritmoStr5 = RITMO_DISPLAY[ritmoModelo3] || ritmoModelo3;
+            //const instrucao5 = gerarInstrucao5aEspecie(tratamentoC, ritmoModelo3);
+            enunciado3 = `Escreva um contraponto de 5ª espécie com o tratamento <strong>"${tratamentoC}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; letter-spacing: 6px;">${ritmoStr5}</span><br>`;
         } else {
             enunciado3 = `Escreva uma dissonância do tipo <strong>"${tratamentoC}"</strong> no contraponto — use a estrutura rítmica: <strong>mínima mínima semibreve</strong> (use o teclado abaixo):`;
         }
@@ -2160,7 +2879,7 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
     const canvas = document.getElementById('notation-canvas');
     if (!canvas) return;
     try {
-        const duracaoMap = { 'w':4, 'h':2, 'q':1, '8':0.5, 'hr':2, 'qr':1 };
+        const duracaoMap = { 'w':4, 'h':2, 'q':1, '8':0.5, 'hr':2, 'qr':1, 'hd':3 };
         function distribuirEmCompassos(notas) {
             const compassos = []; let compasso = []; let tempos = 0; const MAX = 4;
             (notas || []).forEach(n => { const dur = duracaoMap[n.duration] || 1;
@@ -2213,6 +2932,7 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
                         return new Vex.Flow.StaveNote({ keys: [restKey], duration: 'qr', clef: clef });
                     }
                     const stemDir = getStemDirection(n.note, clef);
+                    // mínima com ponto: VexFlow usa duration 'hd'
                     return new Vex.Flow.StaveNote({
                         keys: [n.note],
                         duration: n.duration,
@@ -2245,27 +2965,27 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             allSnotesCP.push(...snotesCP);
         }
 
-        // Desenhar ligadura na 4ª espécie (entre prep e diss, que são a mesma nota)
-        if (currentSpecies === 4 && contraponto && contraponto.length >= 2) {
-            // Encontrar as posições prep e diss no contraponto original
-            // S1: [hr, prep, diss, res] → índices 1 e 2
-            // S2: [cons, prep, diss, res] → índices 1 e 2
-            // NP: sem ligadura
-            const rm = (contraponto._ritmoModelo4) || '';
+        // Desenhar ligadura na 4ª e 5ª espécie
+        if ((currentSpecies === 4 || currentSpecies === 5) && contraponto && contraponto.length >= 2) {
+            const rm = (contraponto._ritmoModelo4) || (contraponto._ritmoModelo5) || '';
             let prepIdx = -1, dissIdx = -1;
-            if (rm === 's1' || rm === 's2') {
-                prepIdx = rm === 's1' ? 1 : 1;
-                dissIdx = 2;
-            }
-            // Tentar detectar automaticamente se ritmoModelo não estiver disponível
+            // 4ª espécie
+            if (rm === 's1' || rm === 's2') { prepIdx = 1; dissIdx = 2; }
+            // 5ª espécie — ligaduras entre compasso 1 e compasso 2
+            // 5d: [h, h_, _q, q, h] → índices 1(prep) e 2(diss)
+            // 5e: [hd, q_, _q, q, h] → índices 1(prep) e 2(diss) — hd + q = c1
+            // 5f: [h, q, q_, _q, q, h] → índices 2(prep) e 3(diss)
+            else if (rm === '5d') { prepIdx = 1; dissIdx = 2; }
+            else if (rm === '5e') { prepIdx = 1; dissIdx = 2; }
+            else if (rm === '5f') { prepIdx = 2; dissIdx = 3; }
+            // Auto-detectar se ritmoModelo não disponível
             if (prepIdx < 0 && contraponto.length === 4) {
                 const d0 = contraponto[0]?.duration;
-                if (d0 === 'hr') { prepIdx = 1; dissIdx = 2; }          // s1
-                else if (d0 === 'h') { prepIdx = 1; dissIdx = 2; }      // s2
+                if (d0 === 'hr') { prepIdx = 1; dissIdx = 2; }
+                else if (d0 === 'h') { prepIdx = 1; dissIdx = 2; }
             }
             if (prepIdx >= 0 && dissIdx >= 0 && allSnotesCP.length > dissIdx) {
                 try {
-                    // Mapear índices do contraponto para índices das StaveNotes (descontando pausas)
                     let snoteIdx = 0;
                     const idxMap = {};
                     for (let ci = 0; ci < contraponto.length; ci++) {
@@ -2376,7 +3096,7 @@ function updateNotesList() {
     userContraponto.forEach((nota, idx) => {
         const span = document.createElement('span');
         span.className = 'note-item';
-        const durDisplay = { 'w':'𝅜', 'h':'𝅗𝅥', 'q':'♩', '8':'♪', 'hr':'𝄼', 'qr':'𝄽' }[nota.duration] || nota.duration;
+        const durDisplay = { 'w':'𝅜', 'h':'𝅗𝅥', 'q':'♩', '8':'♪', 'hr':'𝄼', 'qr':'𝄽', 'hd':'𝅗𝅥.' }[nota.duration] || nota.duration;
         let label;
         if (nota.duration === 'hr' || nota.duration === 'qr' || nota.note === null) {
             label = `${durDisplay} Pausa`;
@@ -2481,6 +3201,16 @@ function handleNextOrValidate() {
                 showFeedback(`⚠️ 4ª espécie: número de notas incorreto. Esperado: ${esperado} (${lenEsperado} elementos)`, false);
                 return;
             }
+        } else if (currentSpecies === 5) {
+            const qAtual = questions[currentQuestionIndex];
+            const rm = qAtual?.ritmoModelo || '5c';
+            const len = userContraponto.length;
+            // Validação flexível: a análise completa é feita em analisarContraponto5aEspecie
+            // Aqui só verificamos que pelo menos 2 notas foram inseridas
+            if (len < 2) {
+                showFeedback(`⚠️ 5ª espécie: insira pelo menos 2 notas para o contraponto`, false);
+                return;
+            }
         }
         
         // Toca o contraponto antes de validar
@@ -2489,7 +3219,7 @@ function handleNextOrValidate() {
         activateAudio().then(() => {
             playScore(q.cantus, userContraponto).then(() => {
                 const durTotal = userContraponto.reduce((s, n) => {
-                    const dm = { 'w':2000,'h':1000,'q':500,'8':250,'hr':1000,'qr':500 };
+                    const dm = { 'w':2000,'h':1000,'q':500,'8':250,'hr':1000,'qr':500,'hd':1500 };
                     return s + (dm[n.duration] || 1000);
                 }, 0);
                 setTimeout(() => {
@@ -2867,7 +3597,7 @@ function startExercise() {
     if (ra) ra.classList.remove('show');
 }
 document.addEventListener('keydown', e => {
-    const map = { '1':'w', '2':'h', '4':'q', '8':'8' };
+    const map = { '1':'w', '2':'h', '3':'hd', '4':'q', '8':'8' };
     if (map[e.key]) {
         selectedDuration = map[e.key];
         document.querySelectorAll('.duration-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-duration') === selectedDuration));
@@ -2929,11 +3659,14 @@ const clr = document.getElementById('clear-all-notes'); if (clr) clr.onclick = c
 function updateRestButtonVisibility() {
     const restBtn = document.getElementById('rest-btn');
     const restQrBtn = document.getElementById('rest-qr-btn');
+    const dottedHalfBtn = document.getElementById('dotted-half-btn');
     const speciesVal = parseInt(document.getElementById('species-select')?.value || '2');
-    // Pausa de mínima: disponível na 3ª e na 4ª espécie (modelo S1)
-    if (restBtn) restBtn.style.display = (speciesVal === 3 || speciesVal === 4) ? '' : 'none';
+    // Pausa de mínima: disponível na 3ª, 4ª e 5ª espécie
+    if (restBtn) restBtn.style.display = (speciesVal === 3 || speciesVal === 4 || speciesVal === 5) ? '' : 'none';
     // Pausa de semínima: apenas na 3ª espécie
     if (restQrBtn) restQrBtn.style.display = speciesVal === 3 ? '' : 'none';
+    // Mínima com ponto: apenas na 5ª espécie
+    if (dottedHalfBtn) dottedHalfBtn.style.display = speciesVal === 5 ? '' : 'none';
 }
 const speciesSel = document.getElementById('species-select');
 if (speciesSel) speciesSel.addEventListener('change', updateRestButtonVisibility);
@@ -2941,7 +3674,7 @@ updateRestButtonVisibility();
 
 initPiano();
 setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
-console.log('✅ Sistema de Contraponto carregado - v26.05.1');
+console.log('✅ Sistema de Contraponto carregado - v27.05.2');
 </script>
 </body>
 </html>
