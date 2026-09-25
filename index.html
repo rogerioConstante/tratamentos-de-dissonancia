@@ -300,6 +300,11 @@ let toneReverb = null;
 let toneChorus = null;
 let samplerPiano = null;
 
+// Abrir o arquivo diretamente (duplo-clique, file://) bloqueia o carregamento
+// das amostras de áudio por política de segurança do navegador (CORS).
+// É preciso servir a pasta por HTTP (ver instruções no console).
+const isFileProtocol = (location.protocol === 'file:');
+
 function setAudioStatus(msg, isWarn = false) {
     console.log(isWarn ? "⚠️ " + msg : "✅ " + msg);
     const el = document.getElementById('audio-status');
@@ -329,6 +334,23 @@ async function initToneAdvanced() {
 
         toneReady = true;
         setAudioStatus("🎹 Motor de áudio pronto! 🎵");
+
+        if (isFileProtocol) {
+            // Sem servidor HTTP, o navegador bloqueia (CORS) o fetch dos .mp3
+            // mesmo que o arquivo exista no disco. Não adianta tentar de novo:
+            // é preciso servir a pasta (ver instruções no console) ou usar
+            // um dos instrumentos sintetizados (FM/AM/Synth).
+            console.warn(
+                '🎹 Piano Real (amostras) desativado: a página foi aberta como arquivo local (file://).\n' +
+                'Os navegadores bloqueiam o carregamento de áudio por CORS nesse modo.\n' +
+                'Para usar o Piano Real, sirva esta pasta por HTTP, por exemplo:\n' +
+                '  python3 -m http.server 8000\n' +
+                'e depois abra http://localhost:8000/ (em vez de abrir o .html direto).\n' +
+                'Alternativa: use a extensão "Live Server" do VS Code.'
+            );
+            disableSamplerOption();
+            return;
+        }
 
         // Carrega o Sampler em paralelo, sem bloquear os outros instrumentos
         const amostras = {
@@ -366,6 +388,20 @@ async function initToneAdvanced() {
     }
 }
 
+function disableSamplerOption() {
+    const sel = document.getElementById('instrument-select');
+    if (!sel) return;
+    const samplerOpt = Array.from(sel.options).find(o => o.value === 'sampler');
+    if (samplerOpt) {
+        samplerOpt.disabled = true;
+        samplerOpt.textContent = '🎹 Piano Real (requer servidor local)';
+    }
+    if (sel.value === 'sampler') {
+        sel.value = 'fm';
+        setAudioStatus("⚠️ Piano Real indisponível offline — usando Piano (FM). Veja o console para instruções.", true);
+    }
+}
+
 function humanizeTime(baseTime) { return baseTime + (Math.random() * 0.02 - 0.01); }
 function humanizeVelocity() { return 0.75 + Math.random() * 0.2; }
 
@@ -390,6 +426,8 @@ async function playNotePreview(midiNote, duration = 0.5) {
         if (instrumentType === 'sampler') {
             if (samplerPiano && samplerPiano.loaded) {
                 samplerPiano.triggerAttackRelease(noteName, duration, now, 0.7);
+            } else if (synthCP) {
+                synthCP.triggerAttackRelease(noteName, duration, now, 0.7); // fallback (amostras indisponíveis)
             }
         } else if (synthCP) {
             synthCP.triggerAttackRelease(noteName, duration, now, 0.7);
@@ -483,6 +521,30 @@ async function playScoreTone(cantus, contraponto) {
         }
 
         const contrapontoPlayback = resolverLigadura(contraponto);
+
+        if (instrumentType === 'sampler' && isFileProtocol) {
+            // Amostras nunca vão carregar em file:// — toca com FM em vez de travar mudo.
+            setAudioStatus("⚠️ Piano Real indisponível offline — tocando com Piano (FM).", true);
+            synthCantus.set({ harmonicity: 2, modulationIndex: 3 });
+            synthCP.set({ harmonicity: 1.5, modulationIndex: 2 });
+            let tC0 = 0;
+            (cantus || []).forEach(n => {
+                const dur = durMap[n.duration] || 1;
+                const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
+                synthCantus.triggerAttackRelease(noteName, dur * 0.95, humanizeTime(now + tC0), humanizeVelocity());
+                tC0 += dur;
+            });
+            let tCP0 = 0;
+            (contrapontoPlayback || []).forEach(n => {
+                const dur = durMap[n.duration] || 1;
+                if (n.note !== null && n.duration !== 'hr' && n.duration !== 'qr') {
+                    const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
+                    synthCP.triggerAttackRelease(noteName, dur * 0.95, humanizeTime(now + tCP0), humanizeVelocity() * 0.9);
+                }
+                tCP0 += dur;
+            });
+            return;
+        }
 
         if (instrumentType === 'sampler') {
             if (!samplerPiano || !samplerPiano.loaded) {
@@ -4470,8 +4532,13 @@ document.getElementById('desafio-pausar-btn')?.addEventListener('click', pausarD
 // Iniciar no modo Estudo
 setModo('estudo');
 initPiano();
-setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
-console.log('✅ Sistema de Contraponto carregado - v26.05.3');
+if (isFileProtocol) {
+    disableSamplerOption();
+    setAudioStatus("🎧 Clique para ativar o áudio (Piano Real requer servidor local — veja o console)");
+} else {
+    setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
+}
+console.log('✅ Sistema de Contraponto carregado - v26.05.4');
 </script>
 </body>
 </html>
