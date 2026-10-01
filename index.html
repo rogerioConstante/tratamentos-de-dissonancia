@@ -260,6 +260,11 @@
                 </div>
             </div>
         </div>
+        <div class="notes-list" id="notes-list" style="display:none;">
+            <h5>📝 Notas inseridas (clique para remover):</h5>
+            <div id="inserted-notes-container" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;"><span style="color:#9a9a9a;">Nenhuma nota inserida</span></div>
+            <div class="notes-buttons"><button id="clear-all-notes" class="secondary" style="background:#8b3a3a; padding:5px 12px; font-size:12px;">🗑️ Limpar todas</button></div>
+        </div>
         <div class="score-area"><canvas id="notation-canvas" width="800" height="280"></canvas></div>
         <div class="virtual-piano" id="virtual-piano">
             <h4>🎹 Clique nas notas (ou digite no teclado do computador) para construir seu contraponto (C3 = dó central)</h4>
@@ -270,9 +275,9 @@
                 </label>
             </div>
             <div id="kb-input-hint" style="font-size:12px; color:#9a9a9a; text-align:center; margin-bottom:8px; line-height:1.6;">
-                ⌨️ Entrada por teclado: <b>c d e f g a b</b> = dó ré mi fá sol lá si &nbsp;·&nbsp;
-                <b>+</b> = ♯ &nbsp;·&nbsp; <b>-</b> = ♭ &nbsp;·&nbsp; <b>=</b> = ♮ &nbsp;·&nbsp;
-                <b>↑ / ↓</b> = oitava (atual: <b id="kb-octave-display">3</b>)<span id="kb-accidental-display"></span>
+                ⌨️ Entrada por teclado: <b>c d e f g a b</b> = dó ré mi fá sol lá si (ajustadas à tonalidade atual) &nbsp;·&nbsp;
+                depois da nota, use <b>+</b> ♯ &nbsp;/&nbsp; <b>-</b> ♭ &nbsp;/&nbsp; <b>=</b> ♮ para alterar o acidente da última nota &nbsp;·&nbsp;
+                <b>↑ / ↓</b> mudam a oitava da última nota (atual: <b id="kb-octave-display">3</b>)
             </div>
             <div class="duration-controls">
                 <button class="duration-btn" data-duration="w">𝅜 Semibreve <span class="shortcut-hint">(1)</span></button>
@@ -284,11 +289,6 @@
                 <button class="duration-btn species3-only" data-duration="qr" id="rest-qr-btn" style="display:none;">𝄽 Pausa Semínima <span class="shortcut-hint">(Q)</span></button>
             </div>
             <div class="piano-keys" id="piano-keys" style="display:none;"></div>
-            <div class="notes-list" id="notes-list">
-                <h5>📝 Notas inseridas (clique para remover):</h5>
-                <div id="inserted-notes-container" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;"><span style="color:#9a9a9a;">Nenhuma nota inserida</span></div>
-                <div class="notes-buttons"><button id="clear-all-notes" class="secondary" style="background:#8b3a3a; padding:5px 12px; font-size:12px;">🗑️ Limpar todas</button></div>
-            </div>
         </div>
         <div class="answers-area" id="answers-area"><h4>🔘 Selecione a resposta:</h4><div class="alternatives" id="alternatives-container"></div></div>
         <!-- Solução gerada internamente (modo Estudo, pós-validação tipo C) -->
@@ -482,52 +482,79 @@ function numberToNote(num) {
 }
 
 // ==================== ENTRADA DE NOTAS PELO TECLADO DO COMPUTADOR ====================
-// c d e f g a b = dó ré mi fá sol lá si | + = sustenido | - = bemol | = = bequadro | ↑/↓ = oitava
-const KB_BASE_SEMITONE = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
-let kbOctave = 3;           // oitava do usuário (1–5), mesma numeração do teclado virtual
-let kbAccidental = null;    // '#' | 'b' | null (bequadro/natural)
+// c d e f g a b = dó ré mi fá sol lá si (já ajustadas à tonalidade atual).
+// Depois de inserir a nota: + força sustenido | - força bemol | = força bequadro
+// (essa é a forma de inserir uma nota cromática, fora da tonalidade) | ↑ / ↓ mudam a oitava da última nota.
+const KB_BASE_SEMITONE = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }; // letras reconhecidas
+let kbOctave = 3; // oitava "do usuário" (1–5) usada para a próxima nota inserida
 
 function updateKeyboardModeStatus() {
     const octEl = document.getElementById('kb-octave-display');
     if (octEl) octEl.textContent = kbOctave;
-    const accEl = document.getElementById('kb-accidental-display');
-    if (accEl) {
-        const symbols = { '#': ' ♯ (próxima nota)', 'b': ' ♭ (próxima nota)' };
-        accEl.textContent = symbols[kbAccidental] || '';
-    }
 }
 
-function kbLetterToSpelledNote(letter) {
-    let semitone = KB_BASE_SEMITONE[letter];
-    if (kbAccidental === '#') semitone += 1;
-    else if (kbAccidental === 'b') semitone -= 1;
-    semitone = ((semitone % 12) + 12) % 12;
-    return currentNoteNames[semitone];
+function activeComposeQuestion() {
+    const q = questions[currentQuestionIndex];
+    return (q && q.tipo === 'c' && !questionAnswered) ? q : null;
+}
+
+// Índice da última nota real (ignora pausas) inserida pelo usuário
+function getLastEditableNoteIndex() {
+    for (let i = userContraponto.length - 1; i >= 0; i--) {
+        if (userContraponto[i].note !== null) return i;
+    }
+    return -1;
+}
+
+// Grafia diatônica da letra, de acordo com a tonalidade atual (ex.: 'c' em Ré Maior -> 'c#')
+function kbLetterToScaleNote(letter) {
+    const match = currentScale.find(n => n.charAt(0) === letter);
+    return match || letter;
 }
 
 function insertNoteFromKeyboard(letter) {
-    const q = questions[currentQuestionIndex];
-    if (!q || q.tipo !== 'c' || questionAnswered) { kbAccidental = null; updateKeyboardModeStatus(); return; }
-    const spelled = kbLetterToSpelledNote(letter);
-    if (!currentScale.includes(spelled)) {
-        showFeedback('⚠️ Esta nota não pertence à escala atual!', false);
-        kbAccidental = null;
-        updateKeyboardModeStatus();
-        return;
-    }
+    const q = activeComposeQuestion();
+    if (!q) return;
+    const spelled = kbLetterToScaleNote(letter);
     activateAudio();
     const vexNote = usuarioParaVexFlow(spelled, kbOctave);
-    const midiNote = vexToMidi(vexNote);
-    playNotePreview(midiNote, 0.5);
+    playNotePreview(vexToMidi(vexNote), 0.5);
     userContraponto.push({ note: vexNote, duration: selectedDuration });
     updateNotesList();
     drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
-    kbAccidental = null;
-    updateKeyboardModeStatus();
 }
 
-function changeKbOctave(delta) {
-    kbOctave = Math.min(5, Math.max(1, kbOctave + delta));
+// Força o acidente da ÚLTIMA nota inserida (não a próxima) — usado para notas cromáticas
+function setLastNoteAccidental(accidental) {
+    const q = activeComposeQuestion();
+    if (!q) return;
+    const idx = getLastEditableNoteIndex();
+    if (idx === -1) return;
+    const [letraAc, oitava] = userContraponto[idx].note.split('/');
+    const letra = letraAc.charAt(0);
+    const novaNota = (accidental ? letra + accidental : letra) + '/' + oitava;
+    userContraponto[idx].note = novaNota;
+    activateAudio();
+    playNotePreview(vexToMidi(novaNota), 0.5);
+    updateNotesList();
+    drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
+}
+
+// Muda a oitava da ÚLTIMA nota inserida; o resultado passa a valer como padrão para as próximas
+function changeLastNoteOctave(delta) {
+    const q = activeComposeQuestion();
+    if (!q) return;
+    const idx = getLastEditableNoteIndex();
+    if (idx === -1) return;
+    const [letraAc, oitavaStr] = userContraponto[idx].note.split('/');
+    const novaOitava = Math.min(6, Math.max(2, parseInt(oitavaStr) + delta));
+    const novaNota = letraAc + '/' + novaOitava;
+    userContraponto[idx].note = novaNota;
+    kbOctave = novaOitava - 1;
+    activateAudio();
+    playNotePreview(vexToMidi(novaNota), 0.5);
+    updateNotesList();
+    drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
     updateKeyboardModeStatus();
 }
 
@@ -3692,6 +3719,7 @@ function renderCurrentQuestion() {
     atualizarBotoesClave(q.contraClef || (q.partitura?.contraClef) || 'bass');
     
     const pianoDiv = document.getElementById('virtual-piano'); 
+    const notesListDiv = document.getElementById('notes-list');
     if (pianoDiv) {
         pianoDiv.style.display = q.tipo === 'c' ? 'block' : 'none';
         if (q.tipo === 'c' && alreadyAnswered) {
@@ -3701,6 +3729,11 @@ function renderCurrentQuestion() {
             pianoDiv.style.opacity = '1';
             pianoDiv.style.pointerEvents = 'auto';
         }
+    }
+    if (notesListDiv) {
+        notesListDiv.style.display = q.tipo === 'c' ? 'block' : 'none';
+        notesListDiv.style.opacity = (q.tipo === 'c' && alreadyAnswered) ? '0.5' : '1';
+        notesListDiv.style.pointerEvents = (q.tipo === 'c' && alreadyAnswered) ? 'none' : 'auto';
     }
     
     const tratamentos = [...tratamentosPorEspecie[currentSpecies]];
@@ -4498,6 +4531,8 @@ function setModo(modo) {
     if (ra) ra.classList.remove('show');
     const pianoDiv = document.getElementById('virtual-piano');
     if (pianoDiv) pianoDiv.style.display = 'none';
+    const notesListDiv = document.getElementById('notes-list');
+    if (notesListDiv) notesListDiv.style.display = 'none';
     drawBlankScore('superior','treble','bass');
 }
 
@@ -4540,15 +4575,15 @@ document.addEventListener('keydown', e => {
             insertNoteFromKeyboard(letter);
             e.preventDefault();
         } else if (e.key === '+') {
-            kbAccidental = '#'; updateKeyboardModeStatus(); e.preventDefault();
+            setLastNoteAccidental('#'); e.preventDefault();
         } else if (e.key === '-') {
-            kbAccidental = 'b'; updateKeyboardModeStatus(); e.preventDefault();
+            setLastNoteAccidental('b'); e.preventDefault();
         } else if (e.key === '=') {
-            kbAccidental = null; updateKeyboardModeStatus(); e.preventDefault();
+            setLastNoteAccidental(null); e.preventDefault();
         } else if (e.key === 'ArrowUp') {
-            changeKbOctave(1); e.preventDefault();
+            changeLastNoteOctave(1); e.preventDefault();
         } else if (e.key === 'ArrowDown') {
-            changeKbOctave(-1); e.preventDefault();
+            changeLastNoteOctave(-1); e.preventDefault();
         }
     }
 });
