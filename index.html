@@ -298,9 +298,14 @@
         <div class="answers-area" id="answers-area"><h4>🔘 Selecione a resposta:</h4><div class="alternatives" id="alternatives-container"></div></div>
         <!-- Solução gerada internamente (modo Estudo, pós-validação tipo C) -->
         <div id="solucao-container">
-            <h5>💡 Uma possibilidade de resolução:</h5>
-            <p style="font-size:13px; color:#9a9a9a; margin-bottom:8px;">Existem outras soluções válidas — compare com a sua.</p>
-            <canvas id="solucao-canvas" width="800" height="150" style="background:#fff; border-radius:5px; display:block; max-width:100%;"></canvas>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                <h5 style="margin:0;">💡 Exemplo de solução</h5>
+                <button id="toggle-solucao-btn" class="secondary" style="padding:5px 12px; font-size:12px;">👁️ Ver exemplo de solução</button>
+            </div>
+            <div id="solucao-body" style="display:none; margin-top:8px;">
+                <p style="font-size:13px; color:#9a9a9a; margin-bottom:8px;">Existem outras soluções válidas — esta é apenas um exemplo, diferente da sua resposta. Enquanto estiver visível, o botão "🔊 Ouvir" toca este exemplo.</p>
+                <canvas id="solucao-canvas" width="800" height="150" style="background:#fff; border-radius:5px; display:block; max-width:100%;"></canvas>
+            </div>
         </div>
         <div class="report-area" id="report-area"><h3>📈 RELATÓRIO FINAL</h3><div id="report-content"></div></div>
     </div>
@@ -517,16 +522,37 @@ function kbLetterToScaleNote(letter) {
     return match || letter;
 }
 
+// Oitava (VexFlow, 2–6) que deixa a classe de altura `spelled` mais próxima, em semitons, de `referenceMidi`
+function kbOctavaMaisProxima(spelled, referenceMidi) {
+    const semitone = currentNoteNames.indexOf(spelled);
+    let melhor = 4, menorDist = Infinity;
+    for (let vexOct = 2; vexOct <= 6; vexOct++) {
+        const candidato = (vexOct + 1) * 12 + semitone;
+        const dist = Math.abs(candidato - referenceMidi);
+        if (dist < menorDist) { menorDist = dist; melhor = vexOct; }
+    }
+    return melhor;
+}
+
 function insertNoteFromKeyboard(letter) {
     const q = activeComposeQuestion();
     if (!q) return;
     const spelled = kbLetterToScaleNote(letter);
+    // Oitava por proximidade com a última nota real inserida; sem nota anterior, usa a oitava padrão atual.
+    let userOct = kbOctave;
+    const prevIdx = getLastEditableNoteIndex();
+    if (prevIdx !== -1) {
+        const prevMidi = vexToMidi(userContraponto[prevIdx].note);
+        userOct = kbOctavaMaisProxima(spelled, prevMidi) - 1;
+    }
     activateAudio();
-    const vexNote = usuarioParaVexFlow(spelled, kbOctave);
+    const vexNote = usuarioParaVexFlow(spelled, userOct);
     playNotePreview(vexToMidi(vexNote), 0.5);
     userContraponto.push({ note: vexNote, duration: selectedDuration });
+    kbOctave = userOct; // referência para ajustes manuais (setas) na sequência
     updateNotesList();
     drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
+    updateKeyboardModeStatus();
 }
 
 // Força o acidente da ÚLTIMA nota inserida (não a próxima) — usado para notas cromáticas
@@ -594,21 +620,17 @@ async function playScoreTone(cantus, contraponto) {
         const durMap = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25, 'hr': 1.0, 'qr': 0.5, 'hd': 1.5, 'wr': 2.0, '8r': 0.25, 'hdr': 1.5 };
         const instrumentType = document.getElementById('instrument-select')?.value || 'fm';
 
-        // ── Fundir notas ligadas na 4ª e 5ª espécie (prep + diss → uma nota de duração somada) ──
+        // ── Fundir notas ligadas (prep + diss → uma nota de duração somada) ──
+        // Usa o mesmo par de índices explícito gravado na geração da questão (ver TIE_PAIR_BY_RITMO),
+        // nunca uma adivinhação por espécie/comprimento/duração.
         function resolverLigadura(cp) {
-            if ((currentSpecies !== 4 && currentSpecies !== 5) || !cp || cp.length < 2) return cp;
+            if (!cp || cp.length < 2) return cp;
             const durV = { 'w':4,'h':2,'q':1,'8':0.5,'hr':2,'qr':1,'hd':3,'wr':4,'8r':0.5,'hdr':3 };
-            // Detectar par prep+diss (mesma nota, posições consecutivas)
-            let prepIdx = -1, dissIdx = -1;
-            const rm = cp._ritmoModelo4 || cp._ritmoModelo5 || '';
-            if (rm === 's1' || rm === '5d') { prepIdx = 1; dissIdx = 2; }
-            else if (rm === 's2' || rm === '5e') { prepIdx = 1; dissIdx = 2; }
-            else if (rm === '5f') { prepIdx = 2; dissIdx = 3; }
-            else if (cp.length === 4) {
-                const d0 = cp[0]?.duration;
-                if (d0 === 'hr' || d0 === 'h') { prepIdx = 1; dissIdx = 2; }
-            }
-            if (prepIdx < 0 || dissIdx >= cp.length) return cp;
+            const rm = cp._ritmoModelo || cp._ritmoModelo4 || cp._ritmoModelo5 || '';
+            const par = getTiePair(rm);
+            if (!par) return cp;
+            const [prepIdx, dissIdx] = par;
+            if (dissIdx >= cp.length) return cp;
             const prep = cp[prepIdx]; const diss = cp[dissIdx];
             if (!prep?.note || !diss?.note || prep.note !== diss.note) return cp;
             const durPrep = durV[prep.duration] || 2;
@@ -971,14 +993,18 @@ function gerarParValido(tratamento, isUpperVoice, maxTentativas = 20) {
             if (resultado4) {
                 contraponto = resultado4.notas;
                 // Fallback: se ritmoModelo não veio (caso de NP/Bordaduras), define como 'np'
-                cantus._ritmoModelo4 = resultado4.ritmoModelo || 'np';
+                const rm4 = resultado4.ritmoModelo || 'np';
+                cantus._ritmoModelo4 = rm4;
+                contraponto._ritmoModelo = rm4; // fonte única usada por drawScore/resolverLigadura
             }
         } else if (currentSpecies === 5) {
             const resultado5 = gerarContraponto5aEspecie(tratamento, cantus, isUpperVoice);
             if (resultado5) {
                 contraponto = resultado5.notas;
-                contraponto._ritmoModelo5 = resultado5.ritmoModelo || '5c';
-                cantus._ritmoModelo5 = resultado5.ritmoModelo || '5c';
+                const rm5 = resultado5.ritmoModelo || '5c';
+                contraponto._ritmoModelo5 = rm5;
+                cantus._ritmoModelo5 = rm5;
+                contraponto._ritmoModelo = rm5; // fonte única usada por drawScore/resolverLigadura
             }
         }
         if (Array.isArray(contraponto) && contraponto.length > 0) {
@@ -2297,9 +2323,9 @@ function validarRespostaEscrita(q) {
         const percentual = (pontuacao * 100).toFixed(1);
         showFeedback(`✅ Correto! Pontuação: ${pontuacao.toFixed(2)} (${percentual}%) na ${questionAttempts[currentQuestionIndex]}ª tentativa`, true);
 
-        // Mostrar solução no modo Estudo
+        // Oferecer (sem exibir automaticamente) um exemplo de solução, no modo Estudo
         if (currentModo === 'estudo' && q.contrapontoEsperado) {
-            mostrarSolucao(q.cantus, q.contrapontoEsperado, q.cantusPosition, q.cantusClef);
+            ofertarExemploSolucao(q);
         }
 
         // Atualizar Desafio
@@ -3085,6 +3111,10 @@ const RITMO_MODELOS = {
 };
 const RITMO_PESOS = { 'a':4, 'b':3, 'c':2, 'd':1, 's1':1, 's2':1, 'np':1,
                       '5a':2, '5b':2, '5c':3, '5d':2, '5e':2, '5f':1 };
+// Fonte única de verdade para ligaduras: modelo rítmico -> [índice da preparação, índice da dissonância ligada]
+// (índices 0-based dentro do array de notas do contraponto). Modelos ausentes aqui não têm ligadura.
+const TIE_PAIR_BY_RITMO = { 's1':[1,2], 's2':[1,2], '5d':[1,2], '5e':[1,2], '5f':[2,3] };
+function getTiePair(ritmoModelo) { return TIE_PAIR_BY_RITMO[ritmoModelo] || null; }
 
 function sortearRitmoModelo(tratamento) {
     const modelos = RITMO_MODELOS[tratamento] || ['a'];
@@ -3102,16 +3132,16 @@ const RITMO_DISPLAY = {
     'b': '𝄼 ♩ ♩ | ♩ ♩ 𝅗𝅥',
     'c': '𝄽 ♩ ♩ ♩ | 𝅜',
     'd': '𝄽 ♩ ♩ ♩ | ♩ ♩ 𝅗𝅥',
-    's1': '𝄼 𝅗𝅥—|—𝅗𝅥 𝅗𝅥',
-    's2': '𝅗𝅥 𝅗𝅥—|—𝅗𝅥 𝅗𝅥',
+    's1': '𝄼 𝅗𝅥‿|‿𝅗𝅥 𝅗𝅥',
+    's2': '𝅗𝅥 𝅗𝅥‿|‿𝅗𝅥 𝅗𝅥',
     'np': '𝅗𝅥 𝅗𝅥 | 𝅜',
     // 5ª espécie
     '5a': '𝅗𝅥. ♩ | 𝅜',
     '5b': '𝅜 | 𝅗𝅥 𝅗𝅥',
     '5c': '𝅗𝅥. ♩ | ♩ ♩ 𝅗𝅥',
-    '5d': '𝅗𝅥 𝅗𝅥—|—♩ ♩ 𝅗𝅥',
-    '5e': '𝅗𝅥. ♩—|—♩ ♩ 𝅗𝅥',
-    '5f': '𝅗𝅥 ♩ ♩—|—♩ ♩ 𝅗𝅥',
+    '5d': '𝅗𝅥 𝅗𝅥‿|‿♩ ♩ 𝅗𝅥',
+    '5e': '𝅗𝅥. ♩‿|‿♩ ♩ 𝅗𝅥',
+    '5f': '𝅗𝅥 ♩ ♩‿|‿♩ ♩ 𝅗𝅥',
 };
 function gerarInstrucao5aEspecie(tratamento, rm) {
     const rmDisplay = RITMO_DISPLAY[rm] || rm;
@@ -3401,35 +3431,15 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             allSnotesCP.push(...snotesCP);
         }
 
-        // Desenhar ligadura na 4ª e 5ª espécie
-        if ((currentSpecies === 4 || currentSpecies === 5) && contraponto && contraponto.length >= 2) {
-            const rm = (contraponto._ritmoModelo4) || (contraponto._ritmoModelo5) || '';
-            let prepIdx = -1, dissIdx = -1;
-            // 4ª espécie
-            if (rm === 's1' || rm === 's2') { prepIdx = 1; dissIdx = 2; }
-            // 5ª espécie — ligaduras entre compasso 1 e compasso 2
-            // 5d: [h, h_, _q, q, h] → índices 1(prep) e 2(diss)
-            // 5e: [hd, q_, _q, q, h] → índices 1(prep) e 2(diss) — hd + q = c1
-            // 5f: [h, q, q_, _q, q, h] → índices 2(prep) e 3(diss)
-            else if (rm === '5d') { prepIdx = 1; dissIdx = 2; }
-            else if (rm === '5e') { prepIdx = 1; dissIdx = 2; }
-            else if (rm === '5f') { prepIdx = 2; dissIdx = 3; }
-            // Auto-detectar se ritmoModelo não disponível
-            if (prepIdx < 0 && contraponto.length === 4) {
-                const d0 = contraponto[0]?.duration;
-                if (d0 === 'hr') { prepIdx = 1; dissIdx = 2; }
-                else if (d0 === 'h') { prepIdx = 1; dissIdx = 2; }
-            }
-            if (prepIdx >= 0 && dissIdx >= 0 && allSnotesCP.length > dissIdx) {
+        // Desenhar ligadura — índices definidos de forma explícita na geração da questão
+        // (contraponto._ritmoModelo), nunca adivinhados pelo formato/duração das notas.
+        if (contraponto && contraponto.length >= 2) {
+            const rm = contraponto._ritmoModelo || contraponto._ritmoModelo4 || contraponto._ritmoModelo5 || '';
+            const par = getTiePair(rm);
+            if (par && allSnotesCP.length > par[1]) {
                 try {
-                    let snoteIdx = 0;
-                    const idxMap = {};
-                    for (let ci = 0; ci < contraponto.length; ci++) {
-                        idxMap[ci] = snoteIdx;
-                        snoteIdx++;
-                    }
-                    const sn1 = allSnotesCP[idxMap[prepIdx]];
-                    const sn2 = allSnotesCP[idxMap[dissIdx]];
+                    const sn1 = allSnotesCP[par[0]];
+                    const sn2 = allSnotesCP[par[1]];
                     if (sn1 && sn2) {
                         const tie = new Vex.Flow.StaveTie({ first_note: sn1, last_note: sn2, first_indices: [0], last_indices: [0] });
                         tie.setContext(context).draw();
@@ -3557,8 +3567,9 @@ function updateNotesList() {
 function clearAllNotes() { 
     if (!questionAnswered) {
         userContraponto = []; 
-        updateNotesList(); 
         const q = questions[currentQuestionIndex]; 
+        userContraponto._ritmoModelo = q?.ritmoModelo || '';
+        updateNotesList(); 
         if (q && q.tipo === 'c') drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
     }
 }
@@ -3716,6 +3727,11 @@ function renderCurrentQuestion() {
     const pi = document.getElementById('progress-info'); 
     if (pi) pi.innerHTML = `Questão <strong>${currentQuestionIndex+1}</strong> de <strong>${questions.length}</strong> | Tipo: <strong>${q.tipo==='a'?'Auditiva':q.tipo==='b'?'Análise':'Escrita'}</strong> | Espécie: <strong>${currentSpecies}ª</strong> | Tom: <strong>${currentTonalityName}</strong>`;
     
+    ocultarExemploSolucao();
+    if (alreadyAnswered && q.tipo === 'c' && currentModo === 'estudo' && q.contrapontoEsperado) {
+        ofertarExemploSolucao(q);
+    }
+    
     if (q.tipo === 'a') drawBlankScore(q.cantusPosition, q.cantusClef, q.contraClef);
     else if (q.tipo === 'b') {
         drawScore(q.partitura.cantus, q.partitura.contraponto, q.partitura.cantusPosition, q.partitura.cantusClef, q.partitura.contraClef);
@@ -3727,6 +3743,7 @@ function renderCurrentQuestion() {
         }
     else if (q.tipo === 'c') { 
         if (!alreadyAnswered) userContraponto = []; 
+        userContraponto._ritmoModelo = q.ritmoModelo || '';
         updateNotesList(); 
         drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
     }
@@ -3785,7 +3802,10 @@ function renderCurrentQuestion() {
             activateAudio(); 
             if (q.tipo === 'a') playScore(q.cantus, q.contraponto); 
             else if (q.tipo === 'b') playScore(q.partitura.cantus, q.partitura.contraponto); 
-            else if (q.tipo === 'c') playScore(q.cantus, userContraponto); 
+            else if (q.tipo === 'c') {
+                if (exemploSolucaoAtiva && q.contrapontoEsperado) playScore(q.cantus, q.contrapontoEsperado);
+                else playScore(q.cantus, userContraponto);
+            }
         };
     }
     
@@ -3850,8 +3870,7 @@ function checkAnswer(choice, btn, q) {
     updateNextButtonText();
 }
 function proceedToNext() {
-    const sc = document.getElementById('solucao-container');
-    if (sc && currentModo !== 'estudo') sc.style.display = 'none';
+    ocultarExemploSolucao();
 
     if (currentModo === 'desafio') {
         if (currentQuestionIndex + 1 < questions.length) {
@@ -4194,6 +4213,41 @@ function buildRitmoModeloC(tratamento, sp) {
     return '';
 }
 
+// Estado: quando true, "🔊 Ouvir" toca o exemplo de solução em vez da resposta do aluno.
+let exemploSolucaoAtiva = false;
+
+// Em vez de exibir o exemplo automaticamente, mostra apenas o botão que permite ao
+// aluno optar por vê-lo — a resposta dele continua na partitura principal intocada.
+function ofertarExemploSolucao(q) {
+    const sc = document.getElementById('solucao-container');
+    const body = document.getElementById('solucao-body');
+    const btn = document.getElementById('toggle-solucao-btn');
+    if (!sc || !body || !btn) return;
+    sc.style.display = 'block';
+    body.style.display = 'none';
+    exemploSolucaoAtiva = false;
+    btn.textContent = '👁️ Ver exemplo de solução';
+    btn.onclick = () => {
+        exemploSolucaoAtiva = !exemploSolucaoAtiva;
+        if (exemploSolucaoAtiva) {
+            body.style.display = 'block';
+            btn.textContent = '↩️ Ver minha resposta';
+            mostrarSolucao(q.cantus, q.contrapontoEsperado, q.cantusPosition, q.cantusClef);
+        } else {
+            body.style.display = 'none';
+            btn.textContent = '👁️ Ver exemplo de solução';
+        }
+    };
+}
+
+function ocultarExemploSolucao() {
+    exemploSolucaoAtiva = false;
+    const sc = document.getElementById('solucao-container');
+    const body = document.getElementById('solucao-body');
+    if (sc) sc.style.display = 'none';
+    if (body) body.style.display = 'none';
+}
+
 function mostrarSolucao(cantus, contraponto, cantusPos, cantusClef) {
     const sc = document.getElementById('solucao-container');
     if (!sc) return;
@@ -4448,6 +4502,7 @@ function pausarDesafio() {
             const confirmHandler = () => {
                 if (modal) modal.style.display = 'none';
                 userContraponto = [];
+                userContraponto._ritmoModelo = q?.ritmoModelo || '';
                 updateNotesList();
                 desafioPausado = true;
                 document.getElementById('desafio-pausar-btn').innerHTML = '▶ Retomar';
