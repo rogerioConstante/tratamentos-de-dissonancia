@@ -261,9 +261,22 @@
             </div>
         </div>
         <div class="notes-list" id="notes-list" style="display:none;">
-            <h5>📝 Notas inseridas (clique para remover):</h5>
-            <div id="inserted-notes-container" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;"><span style="color:#9a9a9a;">Nenhuma nota inserida</span></div>
-            <div class="notes-buttons"><button id="clear-all-notes" class="secondary" style="background:#8b3a3a; padding:5px 12px; font-size:12px;">🗑️ Limpar todas</button></div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:220px;">
+                    <h5 style="margin-top:0;">📝 Notas inseridas (clique para remover):</h5>
+                    <div id="inserted-notes-container" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;"><span style="color:#9a9a9a;">Nenhuma nota inserida</span></div>
+                    <div class="notes-buttons"><button id="clear-all-notes" class="secondary" style="background:#8b3a3a; padding:5px 12px; font-size:12px;">🗑️ Limpar todas</button></div>
+                </div>
+                <div class="duration-controls" style="margin:0; justify-content:flex-end; flex-shrink:0; max-width:320px;">
+                    <button class="duration-btn" data-duration="w">𝅜 Semibreve <span class="shortcut-hint">(1)</span></button>
+                    <button class="duration-btn" data-duration="h">𝅗𝅥 Mínima <span class="shortcut-hint">(2)</span></button>
+                    <button class="duration-btn" data-duration="hd" id="dotted-half-btn" style="display:none;">𝅗𝅥. Mínima com Ponto <span class="shortcut-hint">(3)</span></button>
+                    <button class="duration-btn" data-duration="q">♩ Semínima <span class="shortcut-hint">(4)</span></button>
+                    <button class="duration-btn" data-duration="8">♪ Colcheia <span class="shortcut-hint">(8)</span></button>
+                    <button class="duration-btn species3-only" data-duration="hr" id="rest-btn" style="display:none;">𝄼 Pausa Mínima <span class="shortcut-hint">(R)</span></button>
+                    <button class="duration-btn species3-only" data-duration="qr" id="rest-qr-btn" style="display:none;">𝄽 Pausa Semínima <span class="shortcut-hint">(Q)</span></button>
+                </div>
+            </div>
         </div>
         <div class="score-area"><canvas id="notation-canvas" width="800" height="280"></canvas></div>
         <div class="virtual-piano" id="virtual-piano">
@@ -277,16 +290,8 @@
             <div id="kb-input-hint" style="font-size:12px; color:#9a9a9a; text-align:center; margin-bottom:8px; line-height:1.6;">
                 ⌨️ Entrada por teclado: <b>c d e f g a b</b> = dó ré mi fá sol lá si (ajustadas à tonalidade atual) &nbsp;·&nbsp;
                 depois da nota, use <b>+</b> ♯ &nbsp;/&nbsp; <b>-</b> ♭ &nbsp;/&nbsp; <b>=</b> ♮ para alterar o acidente da última nota &nbsp;·&nbsp;
-                <b>↑ / ↓</b> mudam a oitava da última nota (atual: <b id="kb-octave-display">3</b>)
-            </div>
-            <div class="duration-controls">
-                <button class="duration-btn" data-duration="w">𝅜 Semibreve <span class="shortcut-hint">(1)</span></button>
-                <button class="duration-btn" data-duration="h">𝅗𝅥 Mínima <span class="shortcut-hint">(2)</span></button>
-                <button class="duration-btn" data-duration="hd" id="dotted-half-btn" style="display:none;">𝅗𝅥. Mínima com Ponto <span class="shortcut-hint">(3)</span></button>
-                <button class="duration-btn" data-duration="q">♩ Semínima <span class="shortcut-hint">(4)</span></button>
-                <button class="duration-btn" data-duration="8">♪ Colcheia <span class="shortcut-hint">(8)</span></button>
-                <button class="duration-btn species3-only" data-duration="hr" id="rest-btn" style="display:none;">𝄼 Pausa Mínima <span class="shortcut-hint">(R)</span></button>
-                <button class="duration-btn species3-only" data-duration="qr" id="rest-qr-btn" style="display:none;">𝄽 Pausa Semínima <span class="shortcut-hint">(Q)</span></button>
+                <b>↑ / ↓</b> mudam a oitava da última nota (atual: <b id="kb-octave-display">3</b>) &nbsp;·&nbsp;
+                <b>0</b> insere uma pausa com a duração selecionada
             </div>
             <div class="piano-keys" id="piano-keys" style="display:none;"></div>
         </div>
@@ -540,6 +545,17 @@ function setLastNoteAccidental(accidental) {
     drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
 }
 
+// Insere uma pausa com a MESMA duração atualmente selecionada (botões/teclas 1,2,3,4,8)
+const KB_REST_FOR_DURATION = { w: 'wr', h: 'hr', hd: 'hdr', q: 'qr', '8': '8r' };
+function insertRestFromKeyboard() {
+    const q = activeComposeQuestion();
+    if (!q) return;
+    const restDur = KB_REST_FOR_DURATION[selectedDuration] || 'qr';
+    userContraponto.push({ note: null, duration: restDur });
+    updateNotesList();
+    drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
+}
+
 // Muda a oitava da ÚLTIMA nota inserida; o resultado passa a valer como padrão para as próximas
 function changeLastNoteOctave(delta) {
     const q = activeComposeQuestion();
@@ -575,13 +591,13 @@ async function playScoreTone(cantus, contraponto) {
         if (!toneReady) { await initToneAdvanced(); if (!toneReady) throw new Error('Falha ao inicializar áudio'); }
 
         const now = Tone.now();
-        const durMap = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25, 'hr': 1.0, 'qr': 0.5, 'hd': 1.5 };
+        const durMap = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25, 'hr': 1.0, 'qr': 0.5, 'hd': 1.5, 'wr': 2.0, '8r': 0.25, 'hdr': 1.5 };
         const instrumentType = document.getElementById('instrument-select')?.value || 'fm';
 
         // ── Fundir notas ligadas na 4ª e 5ª espécie (prep + diss → uma nota de duração somada) ──
         function resolverLigadura(cp) {
             if ((currentSpecies !== 4 && currentSpecies !== 5) || !cp || cp.length < 2) return cp;
-            const durV = { 'w':4,'h':2,'q':1,'8':0.5,'hr':2,'qr':1,'hd':3 };
+            const durV = { 'w':4,'h':2,'q':1,'8':0.5,'hr':2,'qr':1,'hd':3,'wr':4,'8r':0.5,'hdr':3 };
             // Detectar par prep+diss (mesma nota, posições consecutivas)
             let prepIdx = -1, dissIdx = -1;
             const rm = cp._ritmoModelo4 || cp._ritmoModelo5 || '';
@@ -625,7 +641,7 @@ async function playScoreTone(cantus, contraponto) {
             let tCP0 = 0;
             (contrapontoPlayback || []).forEach(n => {
                 const dur = durMap[n.duration] || 1;
-                if (n.note !== null && n.duration !== 'hr' && n.duration !== 'qr') {
+                if (n.note !== null) {
                     const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
                     synthCP.triggerAttackRelease(noteName, dur * 0.95, humanizeTime(now + tCP0), humanizeVelocity() * 0.9);
                 }
@@ -649,7 +665,7 @@ async function playScoreTone(cantus, contraponto) {
             let tCP = 0;
             (contrapontoPlayback || []).forEach(n => {
                 const dur = durMap[n.duration] || 1;
-                if (n.note !== null && n.duration !== 'hr' && n.duration !== 'qr') {
+                if (n.note !== null) {
                     const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
                     samplerPiano.triggerAttackRelease(noteName, dur * 1.05, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
                 }
@@ -676,7 +692,7 @@ async function playScoreTone(cantus, contraponto) {
         let tCP = 0;
         (contrapontoPlayback || []).forEach(n => {
             const dur = durMap[n.duration] || 1;
-            if (n.note !== null && n.duration !== 'hr' && n.duration !== 'qr') {
+            if (n.note !== null) {
                 synthCP.triggerAttackRelease(n.note.replace('/', ''), dur * 0.9, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
             }
             tCP += dur;
@@ -3294,7 +3310,7 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
     const canvas = document.getElementById('notation-canvas');
     if (!canvas) return;
     try {
-        const duracaoMap = { 'w':4, 'h':2, 'q':1, '8':0.5, 'hr':2, 'qr':1, 'hd':3 };
+        const duracaoMap = { 'w':4, 'h':2, 'q':1, '8':0.5, 'hr':2, 'qr':1, 'hd':3, 'wr':4, '8r':0.5, 'hdr':3 };
         function distribuirEmCompassos(notas) {
             const compassos = []; let compasso = []; let tempos = 0; const MAX = 4;
             (notas || []).forEach(n => { const dur = duracaoMap[n.duration] || 1;
@@ -3337,14 +3353,14 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
         function criarStaveNotes(notasComp, clef) {
             return notasComp.map(n => {
                 try {
-                    // Pausas
-                    if (n.duration === 'hr' || (n.note === null && n.duration !== 'qr')) {
+                    // Pausas (qualquer duração pode virar pausa — sempre com note === null)
+                    if (n.note === null) {
+                        const isDottedRest = n.duration === 'hdr';
+                        const vexRestDur = isDottedRest ? 'hr' : (n.duration || 'qr');
                         const restKey = clef === 'bass' ? 'd/3' : 'b/4';
-                        return new Vex.Flow.StaveNote({ keys: [restKey], duration: 'hr', clef: clef });
-                    }
-                    if (n.duration === 'qr' || n.note === null) {
-                        const restKey = clef === 'bass' ? 'd/3' : 'b/4';
-                        return new Vex.Flow.StaveNote({ keys: [restKey], duration: 'qr', clef: clef });
+                        const rn = new Vex.Flow.StaveNote({ keys: [restKey], duration: vexRestDur, clef: clef });
+                        if (isDottedRest) Vex.Flow.Dot.buildAndAttach([rn], { all_voices: true });
+                        return rn;
                     }
                     const stemDir = getStemDirection(n.note, clef);
                     // mínima com ponto: VexFlow usa duration 'hd'
@@ -3449,7 +3465,7 @@ function bestClef(notes) {
 
     let trebleTotal = 0, bassTotal = 0;
     notes.forEach(note => {
-        if (!note.note || note.duration === 'hr' || note.duration === 'qr') return; // skip rests
+        if (!note.note) return; // skip rests
         const midi = noteToNumber(note.note);
         trebleTotal += countLedgerLines(midi, 'treble');
         bassTotal += countLedgerLines(midi, 'bass');
@@ -3516,9 +3532,9 @@ function updateNotesList() {
     userContraponto.forEach((nota, idx) => {
         const span = document.createElement('span');
         span.className = 'note-item';
-        const durDisplay = { 'w':'𝅜', 'h':'𝅗𝅥', 'q':'♩', '8':'♪', 'hr':'𝄼', 'qr':'𝄽', 'hd':'𝅗𝅥.' }[nota.duration] || nota.duration;
+        const durDisplay = { 'w':'𝅜', 'h':'𝅗𝅥', 'q':'♩', '8':'♪', 'hr':'𝄼', 'qr':'𝄽', 'hd':'𝅗𝅥.', 'wr':'𝄻', '8r':'𝄾', 'hdr':'𝄼.' }[nota.duration] || nota.duration;
         let label;
-        if (nota.duration === 'hr' || nota.duration === 'qr' || nota.note === null) {
+        if (nota.note === null) {
             label = `${durDisplay} Pausa`;
             span.style.background = '#666';
         } else {
@@ -3642,7 +3658,7 @@ function handleNextOrValidate() {
         activateAudio().then(() => {
             playScore(q.cantus, userContraponto).then(() => {
                 const durTotal = userContraponto.reduce((s, n) => {
-                    const dm = { 'w':2000,'h':1000,'q':500,'8':250,'hr':1000,'qr':500,'hd':1500 };
+                    const dm = { 'w':2000,'h':1000,'q':500,'8':250,'hr':1000,'qr':500,'hd':1500,'wr':2000,'8r':250,'hdr':1500 };
                     return s + (dm[n.duration] || 1000);
                 }, 0);
                 setTimeout(() => {
@@ -4584,6 +4600,8 @@ document.addEventListener('keydown', e => {
             changeLastNoteOctave(1); e.preventDefault();
         } else if (e.key === 'ArrowDown') {
             changeLastNoteOctave(-1); e.preventDefault();
+        } else if (e.key === '0') {
+            insertRestFromKeyboard(); e.preventDefault();
         }
     }
 });
