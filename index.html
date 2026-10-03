@@ -3132,16 +3132,16 @@ const RITMO_DISPLAY = {
     'b': '𝄼 ♩ ♩ | ♩ ♩ 𝅗𝅥',
     'c': '𝄽 ♩ ♩ ♩ | 𝅜',
     'd': '𝄽 ♩ ♩ ♩ | ♩ ♩ 𝅗𝅥',
-    's1': '𝄼 𝅗𝅥‿|‿𝅗𝅥 𝅗𝅥',
-    's2': '𝅗𝅥 𝅗𝅥‿|‿𝅗𝅥 𝅗𝅥',
+    's1': '𝄼 𝅗𝅥‿| 𝅗𝅥 𝅗𝅥',
+    's2': '𝅗𝅥 𝅗𝅥‿| 𝅗𝅥 𝅗𝅥',
     'np': '𝅗𝅥 𝅗𝅥 | 𝅜',
     // 5ª espécie
     '5a': '𝅗𝅥. ♩ | 𝅜',
     '5b': '𝅜 | 𝅗𝅥 𝅗𝅥',
     '5c': '𝅗𝅥. ♩ | ♩ ♩ 𝅗𝅥',
-    '5d': '𝅗𝅥 𝅗𝅥‿|‿♩ ♩ 𝅗𝅥',
-    '5e': '𝅗𝅥. ♩‿|‿♩ ♩ 𝅗𝅥',
-    '5f': '𝅗𝅥 ♩ ♩‿|‿♩ ♩ 𝅗𝅥',
+    '5d': '𝅗𝅥 𝅗𝅥‿| ♩ ♩ 𝅗𝅥',
+    '5e': '𝅗𝅥. ♩‿| ♩ ♩ 𝅗𝅥',
+    '5f': '𝅗𝅥 ♩ ♩‿| ♩ ♩ 𝅗𝅥',
 };
 function gerarInstrucao5aEspecie(tratamento, rm) {
     const rmDisplay = RITMO_DISPLAY[rm] || rm;
@@ -4147,8 +4147,8 @@ function iniciarEstudo() {
     } else if (tipo === 'b') {
         enunciado = `<strong>👁️ Análise</strong> — Analise a partitura e classifique o tratamento de dissonância:`;
     } else {
-        enunciado = buildEnunciadoC(tratamento, sp);
-        ritmoModelo = buildRitmoModeloC(tratamento, sp);
+        ritmoModelo = sortearRitmoModeloParaTratamento(tratamento, sp);
+        enunciado = buildEnunciadoC(tratamento, sp, ritmoModelo);
     }
 
     const cantusClef = bestClef(par.cantus);
@@ -4191,26 +4191,24 @@ function iniciarEstudo() {
     renderCurrentQuestion();
 }
 
-function buildEnunciadoC(tratamento, sp) {
-    if (sp === 3) {
-        const rm = sortearRitmoModelo(tratamento);
-        return `Escreva um contraponto de 3ª espécie com o tratamento <strong>"${tratamento}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; letter-spacing:6px;">${RITMO_DISPLAY[rm]}</span>`;
-    } else if (sp === 4) {
-        const usaSR = tratamento === 'Suspensão' || tratamento === 'Retardo';
-        const rm = usaSR ? sortearRitmoModelo(tratamento) : 'np';
-        return `Escreva um contraponto de 4ª espécie com o tratamento <strong>"${tratamento}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; letter-spacing:6px;">${RITMO_DISPLAY[rm]}</span>`;
-    } else if (sp === 5) {
-        const rm = sortearRitmoModelo5(tratamento);
-        return `Escreva um contraponto de 5ª espécie com o tratamento <strong>"${tratamento}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; letter-spacing:6px;">${RITMO_DISPLAY[rm]||rm}</span>`;
-    }
-    return `Escreva uma dissonância do tipo <strong>"${tratamento}"</strong>:`;
-}
-
-function buildRitmoModeloC(tratamento, sp) {
+// Sorteia o modelo rítmico UMA única vez — usado tanto no enunciado quanto na validação,
+// para que nunca divirjam (bug anterior: cada um sorteava o seu, podendo dar modelos diferentes).
+function sortearRitmoModeloParaTratamento(tratamento, sp) {
     if (sp === 3) return sortearRitmoModelo(tratamento);
     if (sp === 4) return (tratamento === 'Suspensão' || tratamento === 'Retardo') ? sortearRitmoModelo(tratamento) : 'np';
     if (sp === 5) return sortearRitmoModelo5(tratamento);
     return '';
+}
+
+function buildEnunciadoC(tratamento, sp, ritmoModelo) {
+    if (sp === 3) {
+        return `Escreva um contraponto de 3ª espécie com o tratamento <strong>"${tratamento}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; letter-spacing:6px;">${RITMO_DISPLAY[ritmoModelo]}</span>`;
+    } else if (sp === 4) {
+        return `Escreva um contraponto de 4ª espécie com o tratamento <strong>"${tratamento}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; letter-spacing:6px;">${RITMO_DISPLAY[ritmoModelo]}</span>`;
+    } else if (sp === 5) {
+        return `Escreva um contraponto de 5ª espécie com o tratamento <strong>"${tratamento}"</strong>.<br><small>Estrutura rítmica:</small> <span style="font-size:2em; letter-spacing:6px;">${RITMO_DISPLAY[ritmoModelo]||ritmoModelo}</span>`;
+    }
+    return `Escreva uma dissonância do tipo <strong>"${tratamento}"</strong>:`;
 }
 
 // Estado: quando true, "🔊 Ouvir" toca o exemplo de solução em vez da resposta do aluno.
