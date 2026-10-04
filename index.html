@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v26.10.3</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v26.10.04</title>
 
     <!-- BIBLIOTECAS -->
     <script src="./libs/vexflow.js"></script>
@@ -122,7 +122,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Tratamentos de Dissonância</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.10.3</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.10.04</div>
     </div>
 
     <!-- ── ABAS DE MODO ── -->
@@ -1522,7 +1522,6 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     return null;
 }
 // ==================== 3ª ESPÉCIE — ANÁLISE ====================
-// NOTA v26.10.3: cpAbaixo agora vem como parâmetro explícito derivado de q.cantusPosition
 function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo, cpAbaixo) {
     if (!userCP || userCP.length < 4) return { ok: false, erro: 'Número de notas insuficiente' };
     const cf1 = cantus[0].note;
@@ -1770,7 +1769,6 @@ function gerarContraponto4aEspecie(tratamento, cantusNotes, isUpperVoice) {
     return null;
 }
 // ==================== 4ª ESPÉCIE — ANÁLISE ====================
-// NOTA v26.10.3: cpAbaixo agora vem como parâmetro explícito
 function analisarContraponto4aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo, cpAbaixo) {
     const cf1 = cantus[0].note;
     const cf2 = cantus[1].note;
@@ -2182,8 +2180,7 @@ function analisarBordaduraAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbai
     if (!cons(n7, cf2)) return { ok: false, erro: 'Bordadura acentuada (fmt d): mínima final (n7) deve ser consonante' };
     return { ok: true };
 }
-// NOTA v26.10.3: analisarContraponto2aEspecie agora aceita cpAbaixo como parâmetro opcional.
-// Se não for passado, calcula pelo método antigo (compatibilidade).
+
 function analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado, cpAbaixo) {
     if (!userCP || userCP.length !== 3) return { ok: false, erro: 'Número de notas inválido (esperado: 3)' };
     const [n1, n2, n3] = userCP;
@@ -2737,17 +2734,31 @@ function analisarHerdado5esp(userCP, cantus, tratamento, fmt5, cpAbaixo) {
     }
 
     if (fmt5 === '5c') {
+        // [hd, q, q, q, h]: posições 0-1 soam contra CF1, posições 2-4 contra CF2
         const ns = userCP.map(n=>n.note);
         const cfMap = [cf1,cf1,cf2,cf2,cf2];
-        if (!cons(ns[0],cf1)) return {ok:false,erro:'5c: n1 (hd) deve ser consonante com CF1'};
-        if (!cons(ns[2],cf2)) return {ok:false,erro:'5c: n3 (1ª semínima do c2) deve ser consonante com CF2'};
-        if (!cons(ns[4],cf2)) return {ok:false,erro:'5c: n5 (mínima final) deve ser consonante com CF2'};
+
+        // Verificações gerais — mesmas usadas no formato 'a' da 3ª espécie (cruzamento, paralelas, ocultas)
         for (let i=0;i<ns.length;i++) {
-            if (!noCross(ns[i],cfMap[i])) return {ok:false,erro:`5c: cruzamento de vozes na nota ${i+1}`};
+            if (hasCruz(ns[i],cfMap[i],cpAbaixo)) return {ok:false,erro:`5c: cruzamento de vozes na nota ${i+1}`};
+        }
+        for (let i=0;i<ns.length-1;i++) {
+            if (hasParalelasCP(ns[i],ns[i+1],cfMap[i],cfMap[i+1])) return {ok:false,erro:`5c: paralelas proibidas entre as notas ${i+1} e ${i+2}`};
+            if (hasOcultas(ns[i],ns[i+1],cfMap[i],cfMap[i+1],cpAbaixo)) return {ok:false,erro:`5c: oitavas/quintas ocultas entre as notas ${i+1} e ${i+2}`};
         }
         const temDiss = ns.some((n,i)=>diss(n,cfMap[i]));
         if (!temDiss) return {ok:false,erro:'5c: inclua pelo menos uma dissonância tratada'};
-        return {ok:true};
+
+        // Delegar para o analisador específico do tratamento — a mesma lógica de busca de forma
+        // usada quando o ritmo digitado é o formato 'a' da 3ª espécie, agora também para o 5c.
+        if (tratamento === 'Nota de passagem')             return analisarNP3(ns, cfMap);
+        if (tratamento === 'Bordadura')                    return analisarBordadura3(ns, cfMap);
+        if (tratamento === 'Cambiata')                      return analisarCambiata3(ns, cfMap);
+        if (tratamento === 'Bordadura dupla')               return analisarBordaduraDupla3(ns, cfMap);
+        if (tratamento === 'Grupo de notas de passagem')    return analisarGrupoNP3(ns, cfMap);
+        if (tratamento === 'Nota de passagem acentuada')    return analisarNPAcentuadaStd(ns, cfMap);
+        if (tratamento === 'Bordadura acentuada')           return analisarBordaduraAcentuadaStd(ns, cfMap);
+        return {ok:false,erro:'5c: tratamento não reconhecido'};
     }
 
     return {ok:false,erro:'Formato não reconhecido'};
@@ -3252,7 +3263,7 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
                     }
                     const stemDir = getStemDirection(n.note, clef);
                     if (n.duration === 'hd') {
-                        sn = new Vex.Flow.StaveNote({
+                        const sn = new Vex.Flow.StaveNote({
                             keys: [n.note],
                             duration: 'h',
                             dots: 1,
@@ -4551,7 +4562,7 @@ if (isFileProtocol) {
 } else {
     setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
 }
-console.log('✅ Sistema de Contraponto carregado - v26.10.3');
+console.log('✅ Sistema de Contraponto carregado - v26.10.04');
 </script>
 </body>
 </html>
