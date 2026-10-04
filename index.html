@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v26.05.3</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v26.10.3</title>
 
     <!-- BIBLIOTECAS -->
     <script src="./libs/vexflow.js"></script>
@@ -122,7 +122,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Tratamentos de Dissonância</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.05.3</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.10.3</div>
     </div>
 
     <!-- ── ABAS DE MODO ── -->
@@ -268,7 +268,7 @@
                     <div class="notes-buttons"><button id="clear-all-notes" class="secondary" style="background:#8b3a3a; padding:5px 12px; font-size:12px;">🗑️ Limpar todas</button></div>
                 </div>
                 <div class="duration-controls" style="margin:0; justify-content:flex-end; flex-shrink:0; max-width:320px;">
-                    <button class="duration-btn" data-duration="w">𝅜 Semibreve <span class="shortcut-hint">(1)</span></button>
+                    <button class="duration-btn" data-duration="w">𝅝 Semibreve <span class="shortcut-hint">(1)</span></button>
                     <button class="duration-btn" data-duration="h">𝅗𝅥 Mínima <span class="shortcut-hint">(2)</span></button>
                     <button class="duration-btn" data-duration="hd" id="dotted-half-btn" style="display:none;">𝅗𝅥. Mínima com Ponto <span class="shortcut-hint">(3)</span></button>
                     <button class="duration-btn" data-duration="q">♩ Semínima <span class="shortcut-hint">(4)</span></button>
@@ -1522,7 +1522,8 @@ function gerarContraponto3aEspecie(tratamento, cantus, isUpperVoice) {
     return null;
 }
 // ==================== 3ª ESPÉCIE — ANÁLISE ====================
-function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo) {
+// NOTA v26.10.3: cpAbaixo agora vem como parâmetro explícito derivado de q.cantusPosition
+function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo, cpAbaixo) {
     if (!userCP || userCP.length < 4) return { ok: false, erro: 'Número de notas insuficiente' };
     const cf1 = cantus[0].note;
     const cf2 = cantus[1].note;
@@ -1542,32 +1543,28 @@ function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
         fmt = 'd';
     } else {
         // Mensagem de erro orientada pelo ritmoModelo esperado
-        const esperado = RITMO_DISPLAY[ritmoModelo] || '♩ ♩ ♩ ♩ | 𝅜';
+        const esperado = RITMO_DISPLAY[ritmoModelo] || '♩ ♩ ♩ ♩ | 𝅝';
         return { ok: false, erro: `Durações incorretas. Esperado: ${esperado}` };
     }
 
     // Verifica se o formato inserido corresponde ao modelo sorteado
     if (fmt !== ritmoModelo) {
-        const esperado = RITMO_DISPLAY[ritmoModelo] || '♩ ♩ ♩ ♩ | 𝅜';
+        const esperado = RITMO_DISPLAY[ritmoModelo] || '♩ ♩ ♩ ♩ | 𝅝';
         return { ok: false, erro: `Formato incorreto. Use o modelo sorteado: ${esperado}` };
     }
 
     // ── Montar notas e cfNotas por formato ──
     let notas, cfNotas;
     if (fmt === 'a') {
-        // [q q q q | w]  → 5 elementos
         notas   = userCP.map(n => n.note);
         cfNotas = [cf1, cf1, cf1, cf1, cf2];
     } else if (fmt === 'b') {
-        // [hr q q | q q h]  → 6 elementos; pausa no slot 0
         notas   = [null, userCP[1].note, userCP[2].note, userCP[3].note, userCP[4].note, userCP[5].note];
         cfNotas = [cf1,  cf1,            cf1,            cf2,            cf2,            cf2];
     } else if (fmt === 'c') {
-        // [qr q q q | w]  → 5 elementos; pausa no slot 0
         notas   = [null, userCP[1].note, userCP[2].note, userCP[3].note, userCP[4].note];
         cfNotas = [cf1,  cf1,            cf1,            cf1,            cf2];
     } else { // fmt === 'd'
-        // [qr q q q | q q h]  → 7 elementos; pausa no slot 0
         notas   = [null, userCP[1].note, userCP[2].note, userCP[3].note, userCP[4].note, userCP[5].note, userCP[6].note];
         cfNotas = [cf1,  cf1,            cf1,            cf1,            cf2,            cf2,            cf2];
     }
@@ -1576,7 +1573,7 @@ function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
     const diss  = (n, cf) => !cons(n, cf);
     const firstReal = notas.find(n => n !== null);
     if (!firstReal) return { ok: false, erro: 'Nenhuma nota encontrada' };
-    const cpAbaixo = noteToNumber(firstReal) < noteToNumber(cf1);
+    // cpAbaixo agora é parâmetro explícito — não recalcular por comparação de notas
 
     // ── Verificações gerais: escala, cruzamento, paralelas ──
     for (let i = 0; i < notas.length; i++) {
@@ -1612,7 +1609,6 @@ function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
     }
 
     // Formato b: [hr q q | q q h] — pausa de mínima
-    // notas = [null, n2, n3, n4, n5, n6]  cfNotas = [cf1, cf1, cf1, cf2, cf2, cf2]
     if (fmt === 'b') {
         const [, n2, n3, n4, n5, n6] = notas;
         const cf = cfNotas;
@@ -1620,7 +1616,6 @@ function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
             return analisarNPAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo);
         if (tratamentoEsperado === 'Bordadura acentuada')
             return analisarBordaduraAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo);
-        // A, B, D, E, C (cambiata inicia em n2, posição t3 do c1)
         const notasB  = [n2, n3, n4, n5, n6];
         const cfNotasB = [cf1, cf1, cf2, cf2, cf2];
         if (tratamentoEsperado === 'Nota de passagem')           return analisarNP3(notasB, cfNotasB);
@@ -1631,17 +1626,14 @@ function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
     }
 
     // Formato c: [qr q q q | w] — pausa de semínima
-    // notas = [null, n2, n3, n4, n5]  cfNotas = [cf1, cf1, cf1, cf1, cf2]
     if (fmt === 'c') {
         const [, n2, n3, n4, n5] = notas;
         const notasC  = [n2, n3, n4, n5];
         const cfNotasC = [cf1, cf1, cf1, cf2];
-        // n2 é consonância livre (t2 do c1); padrão inicia em n2
         if (tratamentoEsperado === 'Nota de passagem')           return analisarNP3(notasC, cfNotasC);
         if (tratamentoEsperado === 'Bordadura')                  return analisarBordadura3(notasC, cfNotasC);
         if (tratamentoEsperado === 'Bordadura dupla')            return analisarBordaduraDupla3(notasC, cfNotasC);
         if (tratamentoEsperado === 'Grupo de notas de passagem') return analisarGrupoNP3(notasC, cfNotasC);
-        // F e G: dissonância pode cair em n3 (t3 do c1)
         if (tratamentoEsperado === 'Nota de passagem acentuada')
             return analisarNPAcentuadaFmtC(n2, n3, n4, n5, cf1, cf2, cpAbaixo);
         if (tratamentoEsperado === 'Bordadura acentuada')
@@ -1649,11 +1641,9 @@ function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
     }
 
     // Formato d: [qr q q q | q q h] — pausa de semínima, 6 notas reais
-    // notas = [null, n2, n3, n4, n5, n6, n7]  cfNotas = [cf1, cf1, cf1, cf1, cf2, cf2, cf2]
     if (fmt === 'd') {
         const [, n2, n3, n4, n5, n6, n7] = notas;
         const cf = cfNotas;
-        // Cambiata: n2 é consonância livre; padrão n3→n7
         if (tratamentoEsperado === 'Cambiata') {
             const consN2 = cons(n2, cf1);
             if (!consN2) return { ok: false, erro: 'Cambiata (fmt d): n2 deve ser consonante (nota livre)' };
@@ -1661,12 +1651,10 @@ function analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
             const cfCamb = [cf1, cf1, cf2, cf2, cf2];
             return analisarCambiata3(notasCamb, cfCamb);
         }
-        // F e G: dissonância em t3 do c1 (n3) e/ou t1 do c2 (n5)
         if (tratamentoEsperado === 'Nota de passagem acentuada')
             return analisarNPAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbaixo);
         if (tratamentoEsperado === 'Bordadura acentuada')
             return analisarBordaduraAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbaixo);
-        // A, B, D, E: n2 consonância livre; padrão sobre n2..n7
         const notasD  = [n2, n3, n4, n5, n6, n7];
         const cfNotasD = [cf1, cf1, cf1, cf2, cf2, cf2];
         if (tratamentoEsperado === 'Nota de passagem')           return analisarNP3(notasD, cfNotasD);
@@ -1721,14 +1709,12 @@ function gerarContraponto4aEspecie(tratamento, cantusNotes, isUpperVoice) {
     const rangeMin = cpAbaixo ? s1 - 19 : s1 + 1;
     const rangeMax = cpAbaixo ? s1 - 1  : s1 + 19;
 
-    // Modelos: S1 = [hr, prep, diss(=prep), res]  S2 = [cons, prep, diss(=prep), res]
-    // A diss é a mesma nota que prep — deve ser consonante com CF1 e dissonante com CF2
     const candidatos = [];
     for (let num = rangeMin; num <= rangeMax; num++) {
         const vex = numberToNote(num);
         if (!currentScale.includes(vex.split('/')[0])) continue;
-        if (!isConsonant(num - s1)) continue;   // prep consonante com CF1
-        if (isConsonant(num - s2)) continue;    // mesma nota dissonante com CF2
+        if (!isConsonant(num - s1)) continue;
+        if (isConsonant(num - s2)) continue;
         candidatos.push(vex);
     }
     if (candidatos.length === 0) return null;
@@ -1736,7 +1722,6 @@ function gerarContraponto4aEspecie(tratamento, cantusNotes, isUpperVoice) {
     const shuffled = embaralhar([...candidatos]);
     for (const prep of shuffled) {
         const prepNum = noteToNumber(prep);
-        // Resolução: grau conjunto descendente (Suspensão) ou ascendente (Retardo)
         const dir = resolvDown ? -1 : 1;
         const res = scaleStep(prep, dir);
         if (!res) continue;
@@ -1744,13 +1729,10 @@ function gerarContraponto4aEspecie(tratamento, cantusNotes, isUpperVoice) {
         if (!isConsonant(noteToNumber(res) - s2)) { continue; };
         if (hasCruzamento(prep, cf1, cpAbaixo)) { continue; };
         if (hasCruzamento(res,  cf2, cpAbaixo)) { continue; };
-        //if (hasParalelas(prep, res, cf1, cf2)) { console.log(": teste prep. res paralelas: falhou!"); continue; };
 
-        // Sortear modelo S1 ou S2 aleatoriamente
         const modelo = Math.random() < 0.5 ? 's1' : 's2';
 
         if (modelo === 's1') {
-            // [pausa_h, prep(t2c1), diss=prep(t1c2), res(t2c2)]
             return {
                 notas: [
                     { note: null, duration: 'hr' },
@@ -1761,8 +1743,6 @@ function gerarContraponto4aEspecie(tratamento, cantusNotes, isUpperVoice) {
                 ritmoModelo: 's1'
             };
         } else {
-            // [cons(t1c1), prep(t2c1), diss=prep(t1c2), res(t2c2)]
-            // Buscar cons livre para t1c1
             const consMin = cpAbaixo ? s1 - 19 : s1 + 1;
             const consMax = cpAbaixo ? s1 - 1  : s1 + 19;
             const consCands = [];
@@ -1775,7 +1755,6 @@ function gerarContraponto4aEspecie(tratamento, cantusNotes, isUpperVoice) {
             }
             const consShuffled = embaralhar(consCands);
             for (const consLivre of consShuffled) {
-                //if (hasParalelas(consLivre, res, cf1, cf2)) { console.log(": teste cons. livre paralelas: falhou!"); continue; };
                 return {
                     notas: [
                         { note: consLivre, duration: 'h' },
@@ -1791,7 +1770,8 @@ function gerarContraponto4aEspecie(tratamento, cantusNotes, isUpperVoice) {
     return null;
 }
 // ==================== 4ª ESPÉCIE — ANÁLISE ====================
-function analisarContraponto4aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo) {
+// NOTA v26.10.3: cpAbaixo agora vem como parâmetro explícito
+function analisarContraponto4aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo, cpAbaixo) {
     const cf1 = cantus[0].note;
     const cf2 = cantus[1].note;
     const cons = (n, cf) => isConsonant(noteToNumber(n) - noteToNumber(cf));
@@ -1805,19 +1785,14 @@ function analisarContraponto4aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
         tratamentoEsperado === 'Bordadura Superior' ||
         tratamentoEsperado === 'Bordadura Inferior') {
         if (ritmoModelo !== 'np') {
-            return { ok: false, erro: 'Modelo rítmico incorreto para NP/Bordadura (esperado: 𝅗𝅥 𝅗𝅥 | 𝅜)' };
+            return { ok: false, erro: 'Modelo rítmico incorreto para NP/Bordadura (esperado: 𝅗𝅥 𝅗𝅥 | 𝅝)' };
         }
-        // Reutiliza análise da 2ª espécie
-        const trat2 = tratamentoEsperado;
-        return analisarContraponto2aEspecie(userCP, cantus, trat2);
+        return analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado, cpAbaixo);
     }
 
-    // Suspensão e Retardo
     const resolvDown = (tratamentoEsperado === 'Suspensão');
 
-    // Determinar formato pelo ritmoModelo sorteado (não pelo conteúdo)
     if (ritmoModelo === 's1') {
-        // Esperado: [hr, h, h, h]  — 4 elementos
         if (len !== 4 || d[0] !== 'hr' || d[1] !== 'h' || d[2] !== 'h' || d[3] !== 'h') {
             return { ok: false, erro: 'Durações incorretas. Esperado: 𝄼 𝅗𝅥 | 𝅗𝅥_ 𝅗𝅥' };
         }
@@ -1840,15 +1815,14 @@ function analisarContraponto4aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
             return { ok: false, erro: 'Suspensão: resolução deve descer por grau conjunto' };
         if (!resolvDown && dirRes !== 1)
             return { ok: false, erro: 'Retardo: resolução deve subir por grau conjunto' };
-        if (hasCruzamento(prep, cf1, noteToNumber(prep) < noteToNumber(cf1)))
+        if (hasCruzamento(prep, cf1, cpAbaixo))
             return { ok: false, erro: 'Cruzamento de vozes na preparação' };
-        if (hasCruzamento(res, cf2, noteToNumber(res) < noteToNumber(cf2)))
+        if (hasCruzamento(res, cf2, cpAbaixo))
             return { ok: false, erro: 'Cruzamento de vozes na resolução' };
         return { ok: true };
     }
 
     if (ritmoModelo === 's2') {
-        // Esperado: [h, h, h, h]  — 4 elementos
         if (len !== 4 || d[0] !== 'h' || d[1] !== 'h' || d[2] !== 'h' || d[3] !== 'h') {
             return { ok: false, erro: 'Durações incorretas. Esperado: 𝅗𝅥 𝅗𝅥 | 𝅗𝅥_ 𝅗𝅥' };
         }
@@ -1856,7 +1830,6 @@ function analisarContraponto4aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
         const prep  = userCP[1].note;
         const disso = userCP[2].note;
         const res   = userCP[3].note;
-        const cpAbaixo = noteToNumber(consLivre) < noteToNumber(cf1);
 
         if (!cons(consLivre, cf1))
             return { ok: false, erro: 'S2: 1ª mínima deve ser consonante com o CF (consonância livre)' };
@@ -1899,7 +1872,7 @@ function checkExtras(notas, cfNotas, extraIdxs) {
         if (idx < notas.length-1 && notas[idx+1] && !isLeapPermitido(n, notas[idx+1], notas[idx+2]))
             return { ok: false, erro: `Salto melódico saindo da posição ${idx+1} deve ser <= 5ª (nota extra)` };
     }
-    return null; // no error
+    return null;
 }
 // ── Nota de passagem ──
 function analisarNP3(notas, cfNotas) {
@@ -1907,10 +1880,8 @@ function analisarNP3(notas, cfNotas) {
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
     const diss = (n,cf) => !cons(n,cf);
 
-    // Check that every dissonance is a proper NP
     for (let i = 0; i < 4; i++) {
         if (!diss(notas[i], cfNotas[i])) continue;
-        // notas[i] is dissonant — verify NP pattern around it
         if (i === 0) return { ok: false, erro: 'Posição 1 (tempo forte) não pode ser dissonante na nota de passagem' };
         const prep = notas[i-1], np = notas[i], res = notas[i+1];
         if (!prep) return { ok: false, erro: `Posição ${i+1}: falta nota de preparação` };
@@ -1923,9 +1894,6 @@ function analisarNP3(notas, cfNotas) {
         if (!cons(prep, cfNotas[i-1])) return { ok: false, erro: `Preparação da NP (posição ${i}): deve ser consonante com o CF` };
         if (!cons(res,  cfNotas[i+1])) return { ok: false, erro: `Resolução da NP (posição ${i+2}): deve ser consonante com o CF` };
     }
-    // Check extra notes consonance and narrow leap
-    // Identify which positions are "free" (not prep, not NP, not res)
-    // (simpler: just check all non-dissonant positions for narrow leaps)
     for (let i = 0; i < notas.length - 1; i++) {
         if (!isLeapPermitido(notas[i], notas[i+1], notas[i+2]) && isConsonant(noteToNumber(notas[i])-noteToNumber(cfNotas[i])) && isConsonant(noteToNumber(notas[i+1])-noteToNumber(cfNotas[i+1])))
             return { ok: false, erro: `Salto entre posições ${i+1} e ${i+2} excede uma 5ª (saltos maiores do que a 5ª devem ser compensados)` };
@@ -1961,28 +1929,19 @@ function analisarCambiata3(notas, cfNotas) {
     const [n1,n2,n3,n4,n5] = notas;
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
 
-    // Detect direction
     const dir = Math.sign(noteToNumber(n2)-noteToNumber(n1));
     if (dir === 0) return { ok: false, erro: 'Cambiata: n1→n2 não pode ser uníssono' };
 
-    // n1→n2: step (2ª)
     if (!isStep(n1, n2)) return { ok: false, erro: 'Cambiata: movimento n1→n2 deve ser por grau (2ª)' };
-    // n2→n3: third (3ª)
     if (!isThird(n2, n3)) return { ok: false, erro: 'Cambiata: movimento n2→n3 deve ser um salto de 3ª' };
-    // direction of n2→n3 must equal dir
     if (Math.sign(noteToNumber(n3)-noteToNumber(n2)) !== dir) return { ok: false, erro: 'Cambiata: o salto de 3ª (n2→n3) deve continuar na mesma direção de n1→n2' };
-    // n3→n4: step (2ª), opposite direction
     if (!isStep(n3, n4)) return { ok: false, erro: 'Cambiata: movimento n3→n4 deve ser por grau (2ª)' };
     if (Math.sign(noteToNumber(n4)-noteToNumber(n3)) === dir) return { ok: false, erro: 'Cambiata: n3→n4 deve ser na direção oposta à do início' };
-    // n4→n5: step (2ª), same direction as n3→n4
     if (!isStep(n4, n5)) return { ok: false, erro: 'Cambiata: movimento n4→n5 (para a semibreve) deve ser por grau (2ª)' };
     if (Math.sign(noteToNumber(n5)-noteToNumber(n4)) !== Math.sign(noteToNumber(n4)-noteToNumber(n3)))
         return { ok: false, erro: 'Cambiata: n4→n5 deve continuar na mesma direção que n3→n4' };
-    // n1 cons
     if (!cons(n1, cfNotas[0])) return { ok: false, erro: 'Cambiata: n1 deve ser consonante com o CF' };
-    // n5 cons
     if (!cons(n5, cfNotas[4])) return { ok: false, erro: 'Cambiata: semibreve final (n5) deve ser consonante com o CF' };
-    // max 2 diss among n2,n3,n4
     const dissCount = [n2,n3,n4].filter((n,i) => !cons(n, cfNotas[i+1])).length;
     if (dissCount > 2) return { ok: false, erro: 'Cambiata: no máximo 2 dissonâncias são permitidas entre n2, n3 e n4' };
 
@@ -1998,7 +1957,6 @@ function analisarBordaduraDupla3(notas, cfNotas) {
         const [na, nb, nc, nd] = notas.slice(start, start + 4);
         const [cfa, cfb, cfc, cfd] = cfNotas.slice(start, start + 4);
 
-        // Validar tratamento: prep → bord1 → bord2 → retorno
         if (!cons(na, cfa)) { melhorErro += `se n1 = ${na}: nota de início do tratamento deve ser consonante com o CF\n`; continue; }
         if (!cons(nd, cfd)) { melhorErro += `se n1 = ${na}: nota de chegada do tratamento deve ser consonante com o CF\n`; continue; }
         if (noteToNumber(na) !== noteToNumber(nd)) { melhorErro += `se n1 = ${na}: nota de chegada do tratamento deve retornar à mesma nota inicial\n`; continue; }
@@ -2008,7 +1966,6 @@ function analisarBordaduraDupla3(notas, cfNotas) {
         const d2 = Math.sign(noteToNumber(nc) - noteToNumber(na));
         if (d1 === d2) { melhorErro += `se n1 = ${na}: bord1 e bord2 devem estar em lados opostos (superior e inferior)\n`; continue; }
 
-        // Validar notas livres (fora do tratamento)
         let erroLivre = null;
         for (let i = 0; i < notas.length; i++) {
             if (i >= start && i <= start + 3) continue;
@@ -2018,7 +1975,6 @@ function analisarBordaduraDupla3(notas, cfNotas) {
         }
         if (erroLivre) { melhorErro += erroLivre; continue; }
 
-        // Validar saltos entre todas as posições consecutivas
         let erroSalto = null;
         for (let i = 0; i < notas.length - 1; i++) {
             if (!isLeapPermitido(notas[i], notas[i + 1], notas[i + 2] ?? null)) {
@@ -2042,7 +1998,6 @@ function analisarGrupoNP3(notas, cfNotas) {
         const [na, nb, nc, nd] = notas.slice(start, start + 4);
         const [cfa, cfb, cfc, cfd] = cfNotas.slice(start, start + 4);
 
-        // Validar tratamento: cons → step → step → step → cons, mesma direção
         if (!cons(na, cfa)) { melhorErro += `se n1 = ${na}: nota de início do tratamento deve ser consonante com o CF\n`; continue; }
         if (!cons(nd, cfd)) { melhorErro += `se n1 = ${na}: nota de chegada do tratamento deve ser consonante com o CF`; continue; }
         if (!isStep(na, nb)) { melhorErro = `se n1 = ${na}: movimento na→nb deve ser por grau conjunto (2ª)\n`; continue; }
@@ -2055,7 +2010,6 @@ function analisarGrupoNP3(notas, cfNotas) {
         const dissCount = [nb, nc].filter((n, i) => !cons(n, [cfb, cfc][i])).length;
         if (dissCount === 0) { melhorErro = `se n1 = ${na}: ao menos uma nota interna (nb ou nc) deve ser dissonante com o CF\n`; continue; }
 
-        // Validar notas livres (fora do tratamento)
         let erroLivre = null;
         for (let i = 0; i < notas.length; i++) {
             if (i >= start && i <= start + 3) continue;
@@ -2065,7 +2019,6 @@ function analisarGrupoNP3(notas, cfNotas) {
         }
         if (erroLivre) { melhorErro += erroLivre; continue; }
 
-        // Validar saltos entre todas as posições consecutivas
         let erroSalto = null;
         for (let i = 0; i < notas.length - 1; i++) {
             if (!isLeapPermitido(notas[i], notas[i + 1], notas[i + 2] ?? null)) {
@@ -2081,8 +2034,6 @@ function analisarGrupoNP3(notas, cfNotas) {
 }
 // ── NP Acentuada — formato padrão ──
 function analisarNPAcentuadaStd(notas, cfNotas) {
-    // cons(extra) → cons(prep) → diss(NP) → cons(res) | cons(extra)
-    // Positions: 0=extra, 1=prep, 2=NP(diss), 3=res, 4=extra
     const [n1,n2,n3,n4,n5] = notas;
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
     if (!cons(n1, cfNotas[0])) return { ok: false, erro: 'NP acentuada: posição 1 deve ser consonante com o CF' };
@@ -2148,8 +2099,6 @@ function analisarBordaduraAcentuadaPausa(n2, n3, n4, n5, n6, cf1, cf2, cpAbaixo)
     return { ok: true };
 }
 // ── NP Acentuada — formato c: [qr q q q | w] ──
-// notas reais: n2(t2,cf1) n3(t3,cf1) n4(t4,cf1) n5(t1c2,cf2)
-// Dissonância acentuada em t3 (n3)
 function analisarNPAcentuadaFmtC(n2, n3, n4, n5, cf1, cf2, cpAbaixo) {
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
     if (!cons(n2, cf1)) return { ok: false, erro: 'NP acentuada (fmt c): n2 deve ser consonante com o CF' };
@@ -2178,14 +2127,11 @@ function analisarBordaduraAcentuadaFmtC(n2, n3, n4, n5, cf1, cf2, cpAbaixo) {
     return { ok: true };
 }
 // ── NP Acentuada — formato d: [qr q q q | q q h] ──
-// notas reais: n2(t2,cf1) n3(t3,cf1) n4(t4,cf1) n5(t1c2,cf2) n6(t2c2,cf2) n7(t3-4c2,cf2)
-// Dissonância pode ocorrer em n3 (t3 do c1) e/ou n5 (t1 do c2)
 function analisarNPAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbaixo) {
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
     const diss = (n,cf) => !cons(n,cf);
     let found = false;
 
-    // Verifica NP em n3 (t3, cf1), preparação=n2, resolução=n4
     if (diss(n3, cf1)) {
         if (!cons(n2, cf1)) return { ok: false, erro: 'NP acentuada (fmt d): preparação n2 deve ser consonante' };
         if (!isStep(n2, n3)) return { ok: false, erro: 'NP acentuada (fmt d): prep→NP (n2→n3) deve ser por grau' };
@@ -2195,7 +2141,6 @@ function analisarNPAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbaixo) {
         if (!cons(n4, cf1)) return { ok: false, erro: 'NP acentuada (fmt d): resolução n4 deve ser consonante' };
         found = true;
     }
-    // Verifica NP em n5 (t1 do c2, cf2), preparação=n4, resolução=n6
     if (diss(n5, cf2)) {
         if (!cons(n4, cf1)) return { ok: false, erro: 'NP acentuada (fmt d): preparação n4 deve ser consonante' };
         if (!isStep(n4, n5)) return { ok: false, erro: 'NP acentuada (fmt d): prep→NP (n4→n5) deve ser por grau' };
@@ -2216,7 +2161,6 @@ function analisarBordaduraAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbai
     const diss = (n,cf) => !cons(n,cf);
     let found = false;
 
-    // Verifica Bordadura em n3 (t3, cf1), preparação=n2, resolução=n4
     if (diss(n3, cf1)) {
         if (!cons(n2, cf1)) return { ok: false, erro: 'Bordadura acentuada (fmt d): preparação n2 deve ser consonante' };
         if (!isStep(n2, n3)) return { ok: false, erro: 'Bordadura acentuada (fmt d): prep→B (n2→n3) deve ser por grau' };
@@ -2225,7 +2169,6 @@ function analisarBordaduraAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbai
         if (!cons(n4, cf1)) return { ok: false, erro: 'Bordadura acentuada (fmt d): resolução n4 deve ser consonante' };
         found = true;
     }
-    // Verifica Bordadura em n5 (t1 do c2, cf2), preparação=n4, resolução=n6
     if (diss(n5, cf2)) {
         if (!cons(n4, cf1)) return { ok: false, erro: 'Bordadura acentuada (fmt d): preparação n4 deve ser consonante' };
         if (!isStep(n4, n5)) return { ok: false, erro: 'Bordadura acentuada (fmt d): prep→B (n4→n5) deve ser por grau' };
@@ -2239,7 +2182,9 @@ function analisarBordaduraAcentuadaFmtD(n2, n3, n4, n5, n6, n7, cf1, cf2, cpAbai
     if (!cons(n7, cf2)) return { ok: false, erro: 'Bordadura acentuada (fmt d): mínima final (n7) deve ser consonante' };
     return { ok: true };
 }
-function analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado) {
+// NOTA v26.10.3: analisarContraponto2aEspecie agora aceita cpAbaixo como parâmetro opcional.
+// Se não for passado, calcula pelo método antigo (compatibilidade).
+function analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado, cpAbaixo) {
     if (!userCP || userCP.length !== 3) return { ok: false, erro: 'Número de notas inválido (esperado: 3)' };
     const [n1, n2, n3] = userCP;
     const cantus1 = cantus[0].note;
@@ -2253,7 +2198,10 @@ function analisarContraponto2aEspecie(userCP, cantus, tratamentoEsperado) {
     if (!isConsonant(resInterval)) return { ok: false, erro: 'Resolução não é consonante' };
     const disInterval = noteToNumber(n2.note) - noteToNumber(cantus1);
     if (isConsonant(disInterval)) return { ok: false, erro: 'A segunda mínima não é dissonante' };
-    const cpAbaixo = noteToNumber(n1.note) < noteToNumber(cantus1);
+    // cpAbaixo agora é parâmetro explícito (fallback: cálculo antigo)
+    if (cpAbaixo === undefined) {
+        cpAbaixo = noteToNumber(n1.note) < noteToNumber(cantus1);
+    }
     if (hasCruzamento(n1.note, cantus1, cpAbaixo)) return { ok: false, erro: 'Cruzamento de vozes na preparação' };
     if (hasCruzamento(n2.note, cantus1, cpAbaixo)) return { ok: false, erro: 'Cruzamento de vozes na dissonância' };
     if (hasCruzamento(n3.note, cantus2, cpAbaixo)) return { ok: false, erro: 'Cruzamento de vozes na resolução' };
@@ -2301,15 +2249,20 @@ function validarRespostaEscrita(q) {
 
     questionAttempts[currentQuestionIndex]++;
 
+    // Determinar cpAbaixo a partir da posição do cantus na questão (fonte única de verdade)
+    // cantusPosition === 'superior' → cantus está em cima → contraponto é a voz de BAIXO (cpAbaixo = true)
+    // cantusPosition === 'inferior' → cantus está embaixo → contraponto é a voz de CIMA (cpAbaixo = false)
+    const cpAbaixo = (q.cantusPosition === 'superior');
+
     let resultado;
     if (currentSpecies === 2) {
-        resultado = analisarContraponto2aEspecie(userContraponto, q.cantus, q.resposta);
+        resultado = analisarContraponto2aEspecie(userContraponto, q.cantus, q.resposta, cpAbaixo);
     } else if (currentSpecies === 3) {
-        resultado = analisarContraponto3aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || 'a');
+        resultado = analisarContraponto3aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || 'a', cpAbaixo);
     } else if (currentSpecies === 4) {
-        resultado = analisarContraponto4aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || 'np');
+        resultado = analisarContraponto4aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || 'np', cpAbaixo);
     } else if (currentSpecies === 5) {
-        resultado = analisarContraponto5aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || '5c');
+        resultado = analisarContraponto5aEspecie(userContraponto, q.cantus, q.resposta, q.ritmoModelo || '5c', cpAbaixo);
     } else {
         resultado = { ok: false, erro: 'Espécie não implementada para validação escrita' };
     }
@@ -2323,12 +2276,10 @@ function validarRespostaEscrita(q) {
         const percentual = (pontuacao * 100).toFixed(1);
         showFeedback(`✅ Correto! Pontuação: ${pontuacao.toFixed(2)} (${percentual}%) na ${questionAttempts[currentQuestionIndex]}ª tentativa`, true);
 
-        // Oferecer (sem exibir automaticamente) um exemplo de solução, no modo Estudo
         if (currentModo === 'estudo' && q.contrapontoEsperado) {
             ofertarExemploSolucao(q);
         }
 
-        // Atualizar Desafio
         if (currentModo === 'desafio') {
             desafioSequencia++;
             if (desafioSequencia > desafioMelhorSequencia) desafioMelhorSequencia = desafioSequencia;
@@ -2340,7 +2291,6 @@ function validarRespostaEscrita(q) {
             atualizarHUD();
         }
 
-        // Se for a última questão, desativa o botão antes de chamar proceedToNext
         if (currentQuestionIndex === questions.length - 1) {
             const nb = document.getElementById('next-btn');
             if (nb) { nb.disabled = true; nb.innerHTML = '✔ Concluído'; }
@@ -2350,7 +2300,6 @@ function validarRespostaEscrita(q) {
         showFeedbackPersistente(`❌ ${resultado.erro} \n- Tentativa ${questionAttempts[currentQuestionIndex]}`, false);
         questionAnswered = false;
 
-        // No Desafio, erros custam vidas
         if (currentModo === 'desafio') {
             desafioSequencia = 0;
             desafioVidas--;
@@ -2364,7 +2313,6 @@ function validarRespostaEscrita(q) {
 }
 // ==================== 5ª ESPÉCIE — GERAÇÃO ====================
 function sortearTratamento5aEspecie() {
-    // Pesos: tratamentos herdados mais frequentes; exclusivos menos frequentes
     const pesos = [
         ['Nota de passagem', 8], ['Bordadura', 6], ['Cambiata', 4],
         ['Bordadura dupla', 4], ['Grupo de notas de passagem', 4],
@@ -2379,20 +2327,16 @@ function sortearTratamento5aEspecie() {
     return pesos[pesos.length-1][0];
 }
 
-// Mapa de ritmos para cada tratamento da 5ª espécie, com modelos possíveis
 const RITMOS_5ESP = {
-    // Herdados da 2ª/3ª espécie — modelos 5a e 5c (h. q|w e h. q|q q h)
     'Nota de passagem':              ['5a','5c','a','b','c','d'],
     'Bordadura':                     ['5a','5c','a','b','c','d'],
     'Cambiata':                      ['5c','a','b','d'],
-    'Bordadura dupla':               ['5a','5c','a','b','c','d'],
-    'Grupo de notas de passagem':    ['5a','5c','a','b','c','d'],
+    'Bordadura dupla':               ['5c','a','b','c','d'],
+    'Grupo de notas de passagem':    ['5c','a','b','c','d'],
     'Nota de passagem acentuada':    ['5b','5c','a','b','c','d'],
     'Bordadura acentuada':           ['5b','5c','a','b','c','d'],
-    // Herdados da 4ª espécie
     'Suspensão':                     ['5d','5e','5f','s1','s2'],
     'Retardo':                       ['5d','5e','5f','s1','s2'],
-    // Exclusivos da 5ª
     'Suspensão com resolução interrompida': ['5d','5e','5f'],
     'Retardo com resolução interrompida':   ['5d','5e','5f'],
     'Apojatura':  ['5b','5c'],
@@ -2416,17 +2360,14 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
     const s2 = noteToNumber(cf2);
     const cpAbaixo = isUpperVoice;
 
-    // Tratamentos herdados: delegar às funções anteriores com modelo 5a ou 5c
     const tratamentosHerdados3 = ['Nota de passagem','Bordadura','Cambiata','Bordadura dupla',
                                    'Grupo de notas de passagem','Nota de passagem acentuada','Bordadura acentuada'];
     if (tratamentosHerdados3.includes(tratamento)) {
-        // Usar geração da 3ª espécie — os modelos 3ª são compatíveis
         const notas = gerarContraponto3aEspecie(tratamento, cantusNotes, isUpperVoice);
         if (!notas) return null;
         return { notas, ritmoModelo: notas[0]?.duration === 'hr' ? 'b' : 'a' };
     }
 
-    // Suspensão e Retardo normais (herdado 4ª): delegar
     if (tratamento === 'Suspensão' || tratamento === 'Retardo') {
         const res4 = gerarContraponto4aEspecie(tratamento, cantusNotes, isUpperVoice);
         if (!res4) return null;
@@ -2446,7 +2387,6 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
     function diss(n,cf) { return !cons(n,cf); }
     function noCross(n,cf) { return !hasCruzamento(n,cf,cpAbaixo); }
 
-    // Candidatos consonantes com cf1 dentro do range
     const cands1 = [];
     for (let num = rangeMin; num <= rangeMax; num++) {
         const vex = numberToNote(num);
@@ -2463,34 +2403,27 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
     const sh1 = embaralhar([...cands1]);
     const sh2 = embaralhar([...cands2]);
 
-    // ── Suspensão com resolução interrompida (Sri) ──
-    // n1=consLivre, n2=prep(cons cf1), n3=diss(=n2, sustentada cf2), n4=interrupção(cons cf2, salto de n3), n5=res(cons cf2, grau de n4)
-    // Modelos: 5d=[h h_ | _q q h], 5e=[hd q_ | _q q h], 5f=[h q q_ | _q q h]
     if (tratamento === 'Suspensão com resolução interrompida' ||
         tratamento === 'Retardo com resolução interrompida') {
         const dirRes = tratamento === 'Suspensão com resolução interrompida' ? -1 : 1;
         for (const prep of sh1) {
             const prepNum = noteToNumber(prep);
             if (!cons(prep,cf1)) continue;
-            if (!diss(prep,cf2)) continue; // prep deve ser dissonante com cf2 (é a nota sustentada)
-            // n4: interrupção consonante com cf2, alcançada por salto de n3 (=prep)
+            if (!diss(prep,cf2)) continue;
             for (const n4 of embaralhar([...cands2])) {
                 if (!cons(n4,cf2)) continue;
                 const saltoN3N4 = Math.abs(noteToNumber(n4) - prepNum);
-                if (saltoN3N4 <= 2) continue; // deve ser salto (não grau)
+                if (saltoN3N4 <= 2) continue;
                 if (!isLeapPermitido(prep,n4,null)) continue;
                 if (!noCross(n4,cf2)) continue;
-                // n5: resolução consonante, alcançada por grau de n4, continuando a resolução
                 const n5 = scaleStep(n4, dirRes);
                 if (!n5 || !inScale(n5)) continue;
                 if (!cons(n5,cf2)) continue;
                 if (!isStep(n4,n5)) continue;
                 if (!noCross(n5,cf2)) continue;
-                // Modelo rítmico: sortear 5d, 5e ou 5f
                 const rm = ['5d','5e','5f'][Math.floor(Math.random()*3)];
                 let n1cands;
                 if (rm === '5f') {
-                    // [h q q_ | _q q h]: n1=consLivre(h), n2=cons(q), n3=prep(q), n4=diss liga, n5=interrup, n6=res
                     n1cands = embaralhar([...sh1]);
                     for (const n1 of n1cands) {
                         if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
@@ -2511,7 +2444,6 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
                         }
                     }
                 } else if (rm === '5e') {
-                    // [hd q_ | _q q h]: n1=hd(cons cf1), n2=prep(q)=diss liga, n3=interrup, n4=res
                     n1cands = embaralhar([...sh1]);
                     for (const n1 of n1cands) {
                         if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
@@ -2526,7 +2458,6 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
                         }
                     }
                 } else {
-                    // 5d: [h h_ | _q q h]: n1=consLivre(h), n2=prep(h)=diss liga, n3=interrup, n4=res
                     n1cands = embaralhar([...sh1]);
                     for (const n1 of n1cands) {
                         if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
@@ -2546,24 +2477,17 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
         return null;
     }
 
-    // ── Apojatura ──
-    // Dissonância no tempo forte (t1 do c2), alcançada por salto, resolve por grau conjunto
-    // Modelo 5b: [w | h h]  → n1=prep(w,cf1), n2=diss(h,cf2,salto de n1), n3=res(h,cf2)
-    // Modelo 5c: [hd q | q q h] → n1=consLivre(hd), n2=cons(q cf1), n3=diss(q cf2 salto), n4=res(q cf2), n5=cons(h cf2)
     if (tratamento === 'Apojatura') {
-        // Modelo 5b
         for (const prep of sh1) {
             if (!cons(prep,cf1)||!noCross(prep,cf1)) continue;
-            // Diss: tempo forte c2, alcançada por salto de prep
             for (let num = cpAbaixo?s2-22:s2+1; num<=(cpAbaixo?s2-1:s2+22); num++) {
                 const apoj = numberToNote(num);
                 if (!inScale(apoj)) continue;
-                if (cons(apoj,cf2)) continue; // deve ser dissonante
+                if (cons(apoj,cf2)) continue;
                 const salto = Math.abs(noteToNumber(apoj)-noteToNumber(prep));
-                if (salto <= 2) continue; // alcançada por salto
+                if (salto <= 2) continue;
                 if (!isLeapPermitido(prep,apoj,null)) continue;
                 if (!noCross(apoj,cf2)) continue;
-                // Res: grau conjunto de apoj
                 for (const dir of [-1,1]) {
                     const res = scaleStep(apoj,dir);
                     if (!res||!inScale(res)) continue;
@@ -2578,13 +2502,11 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
                 }
             }
         }
-        // Modelo 5c: [hd q | q q h]
         for (const n2 of sh1) {
             if (!cons(n2,cf1)||!noCross(n2,cf1)) continue;
             for (const n1 of embaralhar([...sh1])) {
                 if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
                 if (!isLeapPermitido(n1,n2,n2)) continue;
-                // n3=apojatura: diss com cf2, salto de n2
                 for (let num = cpAbaixo?s2-22:s2+1; num<=(cpAbaixo?s2-1:s2+22); num++) {
                     const apoj = numberToNote(num);
                     if (!inScale(apoj)) continue;
@@ -2616,17 +2538,10 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
         return null;
     }
 
-    // ── Antecipação ──
-    // Dissonância no tempo fraco (q), antecipando a nota do tempo forte seguinte
-    // n_ant: dissonante com cf atual, mas igual à resolução (consonante com cf seguinte)
-    // Modelo 5a: [hd q | w] → n1=consLivre(hd cf1), n2=ant(q cf1 diss, mas = res), n3=res(w cf2 cons = n2)
-    // Modelo 5c: [hd q | q q h] → n1=consLivre(hd), n2=ant(q cf1 diss), n3=res(q cf2 cons=n2), n4=cons(q), n5=cons(h)
     if (tratamento === 'Antecipação') {
-        // Modelo 5a
-        for (const n3 of sh2) { // n3 = resolução = semibreve, cons cf2
+        for (const n3 of sh2) {
             if (!cons(n3,cf2)||!noCross(n3,cf2)) continue;
-            // n2 = antecipação: igual a n3, deve ser dissonante com cf1
-            if (!diss(n3,cf1)) continue; // antecipação é dissonância com cf1
+            if (!diss(n3,cf1)) continue;
             const ant = n3;
             for (const n1 of embaralhar([...sh1])) {
                 if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
@@ -2639,7 +2554,6 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
                 return { notas, ritmoModelo:'5a' };
             }
         }
-        // Modelo 5c
         for (const n3 of sh2) {
             if (!cons(n3,cf2)||!noCross(n3,cf2)) continue;
             if (!diss(n3,cf1)) continue;
@@ -2667,40 +2581,32 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
         return null;
     }
 
-    // ── Escapada ──
-    // n1=prep(cons cf1), n2=diss(grau de n1, tempo fraco cf1), n3=res(salto de 3ª, direção oposta, cons cf2)
-    // Modelo 5a: [hd q | w] → n1=consLivre(hd), n2=esc(q diss cf1), n3=res(w cons cf2)
-    // Modelo 5c: [hd q | q q h] → n1=consLivre(hd), n2=esc(q diss cf1), n3=res(q cons cf2), n4,n5=cons
     if (tratamento === 'Escapada') {
         for (const n1 of sh1) {
             if (!cons(n1,cf1)||!noCross(n1,cf1)) continue;
-            // n2: diss com cf1, alcançada por grau de n1
             for (const dir of [-1,1]) {
                 const n2 = scaleStep(n1,dir);
                 if (!n2||!inScale(n2)) continue;
                 if (!isStep(n1,n2)) continue;
-                if (cons(n2,cf1)) continue; // deve ser dissonante
+                if (cons(n2,cf1)) continue;
                 if (!noCross(n2,cf1)) continue;
-                // n3: cons com cf2, salto de 3ª na direção oposta de n1→n2
                 const dirOposta = -dir;
                 for (const n3 of embaralhar([...sh2])) {
                     if (!cons(n3,cf2)||!noCross(n3,cf2)) continue;
                     const salto = noteToNumber(n3)-noteToNumber(n2);
                     if (Math.sign(salto) !== dirOposta) continue;
-                    if (!isThird(n2,n3)) continue; // preferencialmente terça
-                    // Modelo 5a
+                    if (!isThird(n2,n3)) continue;
                     const notas5a = [
                         {note:n1,duration:'hd'},{note:n2,duration:'q'},{note:n3,duration:'w'}
                     ];
                     notas5a._ritmoModelo5 = '5a';
                     return { notas: notas5a, ritmoModelo:'5a' };
                 }
-                // Fallback: qualquer salto consonante na direção oposta
                 for (const n3 of embaralhar([...sh2])) {
                     if (!cons(n3,cf2)||!noCross(n3,cf2)) continue;
                     const salto = noteToNumber(n3)-noteToNumber(n2);
                     if (Math.sign(salto) !== dirOposta) continue;
-                    if (isStep(n2,n3)) continue; // não pode ser grau — deve ser salto
+                    if (isStep(n2,n3)) continue;
                     if (!isLeapPermitido(n2,n3,null)) continue;
                     const notas5a = [
                         {note:n1,duration:'hd'},{note:n2,duration:'q'},{note:n3,duration:'w'}
@@ -2717,7 +2623,7 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
 }
 
 // ==================== 5ª ESPÉCIE — ANÁLISE ====================
-function analisarContraponto5aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo) {
+function analisarContraponto5aEspecie(userCP, cantus, tratamentoEsperado, ritmoModelo, cpAbaixo) {
     const cf1 = cantus[0].note;
     const cf2 = cantus[1].note;
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
@@ -2726,121 +2632,100 @@ function analisarContraponto5aEspecie(userCP, cantus, tratamentoEsperado, ritmoM
     const d = userCP.map(n => n.duration);
     const len = userCP.length;
 
-    // ── Tratamentos herdados: redirecionar para analisadores existentes ──
     const trats3 = ['Nota de passagem','Bordadura','Cambiata','Bordadura dupla',
                     'Grupo de notas de passagem','Nota de passagem acentuada','Bordadura acentuada'];
     if (trats3.includes(tratamentoEsperado)) {
-        // Detectar o modelo pelo conteúdo das durações inseridas
         let fmt3;
         if (d[0]==='q'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='w'&&len===5)           fmt3='a';
         else if (d[0]==='hr'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='q'&&d[5]==='h'&&len===6) fmt3='b';
         else if (d[0]==='qr'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='w'&&len===5)      fmt3='c';
         else if (d[0]==='qr'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='q'&&d[5]==='q'&&d[6]==='h'&&len===7) fmt3='d';
-        // Modelos exclusivos da 5ª espécie para tratamentos herdados
         else if (d[0]==='hd'&&d[1]==='q'&&d[2]==='w'&&len===3)                              fmt3='5a';
         else if (d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h'&&len===5)     fmt3='5c';
         else if (d[0]==='w'&&d[1]==='h'&&d[2]==='h'&&len===3)                               fmt3='5b';
         else return { ok:false, erro:`Formato rítmico não reconhecido para a 5ª espécie. Use o modelo indicado no enunciado` };
 
-        // Modelos clássicos da 3ª espécie: redirecionar para analisarContraponto3aEspecie
         if (['a','b','c','d'].includes(fmt3)) {
-            return analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, fmt3);
+            return analisarContraponto3aEspecie(userCP, cantus, tratamentoEsperado, fmt3, cpAbaixo);
         }
 
-        // Modelos 5a, 5b, 5c: análise própria simplificada
-        return analisarHerdado5esp(userCP, cantus, tratamentoEsperado, fmt3);
+        return analisarHerdado5esp(userCP, cantus, tratamentoEsperado, fmt3, cpAbaixo);
     }
 
     if (tratamentoEsperado === 'Suspensão' || tratamentoEsperado === 'Retardo') {
-        // Inferir modelo s1/s2 das durações
         let rm4;
         if (len===4&&d[0]==='hr'&&d[1]==='h'&&d[2]==='h'&&d[3]==='h') rm4='s1';
         else if (len===4&&d[0]==='h'&&d[1]==='h'&&d[2]==='h'&&d[3]==='h') rm4='s2';
-        // Modelos 5d/5e/5f também aceitos para S/R normais
         else if (len===5&&d[0]==='h'&&d[1]==='h'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') rm4='5d_sr';
         else if (len===5&&d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') rm4='5e_sr';
         else if (len===6&&d[0]==='h'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='q'&&d[5]==='h') rm4='5f_sr';
-        else return { ok:false, erro:`Suspensão/Retardo: formato rítmico não reconhecido. Use 𝅗𝅥 𝅗𝅥— ou variantes da 5ª espécie` };
-        if (rm4==='s1'||rm4==='s2') return analisarContraponto4aEspecie(userCP,cantus,tratamentoEsperado,rm4);
-        // Para modelos 5d/5e/5f: validar prep+diss ligados normalmente
+        else return { ok:false, erro:`Suspensão/Retardo: formato rítmico não reconhecido. Siga o ritmo apresentado no enunciado.` };
+        if (rm4==='s1'||rm4==='s2') return analisarContraponto4aEspecie(userCP,cantus,tratamentoEsperado,rm4,cpAbaixo);
         return analisarSR5esp(userCP,cantus,tratamentoEsperado,rm4);
     }
 
-    // ── Sri / Rri ──
     if (tratamentoEsperado === 'Suspensão com resolução interrompida' ||
         tratamentoEsperado === 'Retardo com resolução interrompida') {
         const dirEsp = tratamentoEsperado.startsWith('Suspensão') ? -1 : 1;
-        // Formatos: 5d=[h,h,q,q,h], 5e=[hd,q,q,q,h], 5f=[h,q,q,q,q,h]
         let fmt5;
         if (len===5&&d[0]==='h'&&d[1]==='h'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') fmt5='5d';
         else if (len===5&&d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') fmt5='5e';
         else if (len===6&&d[0]==='h'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='q'&&d[5]==='h') fmt5='5f';
-        else return { ok:false, erro:`Sri/Rri: formato rítmico incorreto. Use 𝅗𝅥 𝅗𝅥—|—♩ ♩ 𝅗𝅥 (ou variante)` };
+        else return { ok:false, erro:`Sri/Rri: formato rítmico incorreto. Siga o ritmo apresentado no enunciado.` };
         return analisarSriRri(userCP,cantus,tratamentoEsperado,fmt5,dirEsp);
     }
 
-    // ── Apojatura ──
     if (tratamentoEsperado === 'Apojatura') {
         let fmt5;
         if (len===3&&d[0]==='w'&&d[1]==='h'&&d[2]==='h') fmt5='5b';
         else if (len===5&&d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') fmt5='5c';
-        else return { ok:false, erro:`Apojatura: use 𝅜 | 𝅗𝅥 𝅗𝅥 ou 𝅗𝅥. ♩ | ♩ ♩ 𝅗𝅥` };
+        else return { ok:false, erro:`Apojatura: Siga o ritmo apresentado no enunciado.` };
         return analisarApojatura(userCP,cantus,fmt5);
     }
 
-    // ── Antecipação ──
     if (tratamentoEsperado === 'Antecipação') {
         let fmt5;
         if (len===3&&d[0]==='hd'&&d[1]==='q'&&d[2]==='w') fmt5='5a';
         else if (len===5&&d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') fmt5='5c';
-        else return { ok:false, erro:`Antecipação: use 𝅗𝅥. ♩ | 𝅜 ou 𝅗𝅥. ♩ | ♩ ♩ 𝅗𝅥` };
+        else return { ok:false, erro:`Antecipação: Siga o ritmo apresentado no enunciado.` };
         return analisarAntecipacao(userCP,cantus,fmt5);
     }
 
-    // ── Escapada ──
     if (tratamentoEsperado === 'Escapada') {
         let fmt5;
         if (len===3&&d[0]==='hd'&&d[1]==='q'&&d[2]==='w') fmt5='5a';
         else if (len===5&&d[0]==='hd'&&d[1]==='q'&&d[2]==='q'&&d[3]==='q'&&d[4]==='h') fmt5='5c';
-        else return { ok:false, erro:`Escapada: use 𝅗𝅥. ♩ | 𝅜 ou 𝅗𝅥. ♩ | ♩ ♩ 𝅗𝅥` };
+        else return { ok:false, erro:`Escapada: Siga o ritmo apresentado no enunciado.` };
         return analisarEscapada(userCP,cantus,fmt5);
     }
 
     return { ok:false, erro:'Tratamento não reconhecido para a 5ª espécie' };
 }
 
-// Análise de tratamentos herdados da 3ª espécie nos modelos rítmicos exclusivos da 5ª (5a, 5b, 5c)
-function analisarHerdado5esp(userCP, cantus, tratamento, fmt5) {
+function analisarHerdado5esp(userCP, cantus, tratamento, fmt5, cpAbaixo) {
     const cf1 = cantus[0].note, cf2 = cantus[1].note;
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
     const diss = (n,cf) => !cons(n,cf);
     const inScale = n => currentScale.includes(n.split('/')[0]);
-    const cpAbaixo = noteToNumber(userCP.find(n=>n.note!==null)?.note || userCP[0].note) < noteToNumber(cf1);
     const noCross = (n,cf) => !hasCruzamento(n,cf,cpAbaixo);
 
-    // Verificações gerais para todas as notas
     for (const n of userCP) {
         if (!n.note) continue;
         if (!inScale(n.note)) return { ok:false, erro:`Nota "${n.note}" fora da escala` };
     }
 
     if (fmt5 === '5a') {
-        // [hd, q, w]: n1(cf1,forte), n2(cf1,fraco), n3(cf2,forte)
-        // n1 e n3 devem ser consonantes; n2 pode ser dissonante (NP, Bordadura)
         const [n1,n2,n3] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:'5a: primeira nota (hd) deve ser consonante com CF1'};
         if (!cons(n3,cf2)) return {ok:false,erro:'5a: última nota (w) deve ser consonante com CF2'};
         if (!noCross(n1,cf1)) return {ok:false,erro:'5a: cruzamento de vozes na 1ª nota'};
         if (!noCross(n3,cf2)) return {ok:false,erro:'5a: cruzamento de vozes na última nota'};
-        // Verificar que há pelo menos uma dissonância
         const temDiss = diss(n2,cf1);
         if (!temDiss && !diss(n2,cf2)) return {ok:false,erro:'5a: inclua pelo menos uma dissonância tratada'};
         return {ok:true};
     }
 
     if (fmt5 === '5b') {
-        // [w, h, h]: n1(cf1,forte), n2(cf2,forte), n3(cf2,fraco)
-        // n1, n2, n3 no tempo forte — NP acentuada, Bordadura acentuada, Apojatura
         const [n1,n2,n3] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:'5b: semibreve deve ser consonante com CF1'};
         if (!cons(n3,cf2)) return {ok:false,erro:'5b: última nota (h) deve ser consonante com CF2'};
@@ -2852,8 +2737,6 @@ function analisarHerdado5esp(userCP, cantus, tratamento, fmt5) {
     }
 
     if (fmt5 === '5c') {
-        // [hd, q, q, q, h]: n1(cf1), n2(cf1), n3(cf2), n4(cf2), n5(cf2)
-        // n1, n3, n5 nos tempos fortes — devem ser consonantes
         const ns = userCP.map(n=>n.note);
         const cfMap = [cf1,cf1,cf2,cf2,cf2];
         if (!cons(ns[0],cf1)) return {ok:false,erro:'5c: n1 (hd) deve ser consonante com CF1'};
@@ -2876,9 +2759,6 @@ function analisarSR5esp(userCP, cantus, tratamento, rm) {
     const diss = (n,cf) => !cons(n,cf);
     const resolvDown = tratamento === 'Suspensão';
 
-    // 5d: [n1=consLivre(h), n2=prep(h), n3=diss(=n2 ligado)(q), n4=res(q), n5=cons(h)]
-    // 5e: [n1=consLivre(hd), n2=prep(q), n3=diss(=n2)(q), n4=res(q), n5=cons(h)]
-    // 5f: [n1=cl(h), n2=cl(q), n3=prep(q), n4=diss(=n3)(q), n5=res(q), n6=cons(h)]
     if (rm==='5d_sr') {
         const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:'5d S/R: n1 deve ser consonante com CF1'};
@@ -2925,24 +2805,20 @@ function analisarSR5esp(userCP, cantus, tratamento, rm) {
     return {ok:false,erro:'Modelo não reconhecido'};
 }
 
-// Análise Sri/Rri
 function analisarSriRri(userCP, cantus, tratamento, fmt5, dirEsp) {
     const cf1 = cantus[0].note, cf2 = cantus[1].note;
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
     const diss = (n,cf) => !cons(n,cf);
-    // Sri: [n1=cl, n2=prep, n3=diss(=n2 ligado), n4=interrupção cons, n5=res cons]
-    // A resolução (n5) é alcançada por grau conjunto a partir de n3 (não de n4)
     const label = tratamento.startsWith('Suspensão') ? 'Sri' : 'Rri';
 
     if (fmt5==='5d') {
-        // [h, h_, _q, q, h] → notas: n1(h cf1), n2(h cf1 prep), n3(q cf2 diss=n2), n4(q cf2 interrup cons), n5(h cf2 res cons)
         const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:`${label} 5d: n1 deve ser consonante com CF1`};
         if (!cons(n2,cf1)) return {ok:false,erro:`${label} 5d: preparação (n2) deve ser consonante com CF1`};
         if (noteToNumber(n2)!==noteToNumber(n3)) return {ok:false,erro:`${label} 5d: n3 deve ser a mesma nota que n2 (ligada por barra)`};
         if (!diss(n3,cf2)) return {ok:false,erro:`${label} 5d: n3 (sustentada) deve ser dissonante com CF2`};
         if (!cons(n4,cf2)) return {ok:false,erro:`${label} 5d: interrupção (n4) deve ser consonante com CF2`};
-        if (isStep(n3,n4)) return {ok:false,erro:`${label} 5d: n4 (interrupção) deve ser alcançada por salto a partir de n3`};
+        //if (isStep(n3,n4)) return {ok:false,erro:`${label} 5d: n4 (interrupção) deve ser alcançada por salto a partir de n3`};
         if (!cons(n5,cf2)) return {ok:false,erro:`${label} 5d: resolução (n5) deve ser consonante com CF2`};
         if (!isStep(n3,n5)) return {ok:false,erro:`${label} 5d: resolução (n5) deve ser por grau conjunto a partir da dissonância (n3), não de n4`};
         const dir=Math.sign(noteToNumber(n5)-noteToNumber(n3));
@@ -2951,14 +2827,13 @@ function analisarSriRri(userCP, cantus, tratamento, fmt5, dirEsp) {
         return {ok:true};
     }
     if (fmt5==='5e') {
-        // [hd, q_, _q, q, h]
         const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:`${label} 5e: n1 deve ser consonante com CF1`};
         if (!cons(n2,cf1)) return {ok:false,erro:`${label} 5e: preparação (n2) deve ser consonante com CF1`};
         if (noteToNumber(n2)!==noteToNumber(n3)) return {ok:false,erro:`${label} 5e: n3 deve ser a mesma nota que n2 (ligada)`};
         if (!diss(n3,cf2)) return {ok:false,erro:`${label} 5e: n3 deve ser dissonante com CF2`};
         if (!cons(n4,cf2)) return {ok:false,erro:`${label} 5e: interrupção (n4) deve ser consonante com CF2`};
-        if (isStep(n3,n4)) return {ok:false,erro:`${label} 5e: n4 deve ser alcançada por salto a partir de n3`};
+        //if (isStep(n3,n4)) return {ok:false,erro:`${label} 5e: n4 deve ser alcançada por salto a partir de n3`};
         if (!cons(n5,cf2)) return {ok:false,erro:`${label} 5e: resolução (n5) deve ser consonante com CF2`};
         if (!isStep(n3,n5)) return {ok:false,erro:`${label} 5e: resolução (n5) deve ser por grau a partir de n3`};
         const dir=Math.sign(noteToNumber(n5)-noteToNumber(n3));
@@ -2967,7 +2842,6 @@ function analisarSriRri(userCP, cantus, tratamento, fmt5, dirEsp) {
         return {ok:true};
     }
     if (fmt5==='5f') {
-        // [h, q, q_, _q, q, h]
         const [n1,n2,n3,n4,n5,n6] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:`${label} 5f: n1 deve ser consonante com CF1`};
         if (!cons(n2,cf1)) return {ok:false,erro:`${label} 5f: n2 deve ser consonante com CF1`};
@@ -2975,7 +2849,7 @@ function analisarSriRri(userCP, cantus, tratamento, fmt5, dirEsp) {
         if (noteToNumber(n3)!==noteToNumber(n4)) return {ok:false,erro:`${label} 5f: n4 deve ser a mesma nota que n3 (ligada)`};
         if (!diss(n4,cf2)) return {ok:false,erro:`${label} 5f: n4 deve ser dissonante com CF2`};
         if (!cons(n5,cf2)) return {ok:false,erro:`${label} 5f: interrupção (n5) deve ser consonante com CF2`};
-        if (isStep(n4,n5)) return {ok:false,erro:`${label} 5f: n5 deve ser alcançada por salto a partir de n4`};
+        //if (isStep(n4,n5)) return {ok:false,erro:`${label} 5f: n5 deve ser alcançada por salto a partir de n4`};
         if (!cons(n6,cf2)) return {ok:false,erro:`${label} 5f: resolução (n6) deve ser consonante com CF2`};
         if (!isStep(n4,n6)) return {ok:false,erro:`${label} 5f: resolução (n6) deve ser por grau a partir de n4 (dissonância)`};
         const dir=Math.sign(noteToNumber(n6)-noteToNumber(n4));
@@ -2986,14 +2860,12 @@ function analisarSriRri(userCP, cantus, tratamento, fmt5, dirEsp) {
     return {ok:false,erro:'Formato não reconhecido'};
 }
 
-// Análise Apojatura
 function analisarApojatura(userCP, cantus, fmt5) {
     const cf1 = cantus[0].note, cf2 = cantus[1].note;
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
     const diss = (n,cf) => !cons(n,cf);
 
     if (fmt5==='5b') {
-        // [w, h, h]: n1=prep(w cons cf1), n2=apoj(h diss cf2 salto de n1), n3=res(h cons cf2 grau de n2)
         const [n1,n2,n3] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:'Apojatura 5b: n1 (semibreve) deve ser consonante com CF1'};
         if (!diss(n2,cf2)) return {ok:false,erro:'Apojatura 5b: n2 deve ser dissonante com CF2 (tempo forte)'};
@@ -3004,7 +2876,6 @@ function analisarApojatura(userCP, cantus, fmt5) {
         return {ok:true};
     }
     if (fmt5==='5c') {
-        // [hd, q, q, q, h]: n1=cl(hd cf1), n2=cl(q cf1), n3=apoj(q diss cf2 salto), n4=res(q cons cf2), n5=cl(h cf2)
         const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:'Apojatura 5c: n1 deve ser consonante com CF1'};
         if (!cons(n2,cf1)) return {ok:false,erro:'Apojatura 5c: n2 deve ser consonante com CF1'};
@@ -3019,14 +2890,12 @@ function analisarApojatura(userCP, cantus, fmt5) {
     return {ok:false,erro:'Formato não reconhecido'};
 }
 
-// Análise Antecipação
 function analisarAntecipacao(userCP, cantus, fmt5) {
     const cf1 = cantus[0].note, cf2 = cantus[1].note;
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
     const diss = (n,cf) => !cons(n,cf);
 
     if (fmt5==='5a') {
-        // [hd, q, w]: n1=cl(hd cons cf1), n2=ant(q diss cf1), n3=res(w cons cf2 = n2)
         const [n1,n2,n3] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:'Antecipação 5a: n1 deve ser consonante com CF1'};
         if (!diss(n2,cf1)) return {ok:false,erro:'Antecipação 5a: n2 (antecipação) deve ser dissonante com CF1'};
@@ -3035,7 +2904,6 @@ function analisarAntecipacao(userCP, cantus, fmt5) {
         return {ok:true};
     }
     if (fmt5==='5c') {
-        // [hd, q, q, q, h]: n1=cl(hd cf1), n2=ant(q diss cf1), n3=res(q cons cf2=n2), n4=cl(q cf2), n5=cl(h cf2)
         const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:'Antecipação 5c: n1 deve ser consonante com CF1'};
         if (!diss(n2,cf1)) return {ok:false,erro:'Antecipação 5c: n2 (antecipação) deve ser dissonante com CF1'};
@@ -3048,14 +2916,12 @@ function analisarAntecipacao(userCP, cantus, fmt5) {
     return {ok:false,erro:'Formato não reconhecido'};
 }
 
-// Análise Escapada
 function analisarEscapada(userCP, cantus, fmt5) {
     const cf1 = cantus[0].note, cf2 = cantus[1].note;
     const cons = (n,cf) => isConsonant(noteToNumber(n)-noteToNumber(cf));
     const diss = (n,cf) => !cons(n,cf);
 
     if (fmt5==='5a') {
-        // [hd, q, w]: n1=prep(hd cons cf1), n2=esc(q diss cf1 grau de n1), n3=res(w cons cf2 salto de n2 dir oposta)
         const [n1,n2,n3] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:'Escapada 5a: n1 deve ser consonante com CF1'};
         if (!diss(n2,cf1)) return {ok:false,erro:'Escapada 5a: n2 deve ser dissonante com CF1 (escapada)'};
@@ -3069,7 +2935,6 @@ function analisarEscapada(userCP, cantus, fmt5) {
         return {ok:true};
     }
     if (fmt5==='5c') {
-        // [hd, q, q, q, h]: n1=cl(hd cf1), n2=esc(q diss cf1 grau), n3=res(q cons cf2 salto oposto), n4,n5=cons
         const [n1,n2,n3,n4,n5] = userCP.map(n=>n.note);
         if (!cons(n1,cf1)) return {ok:false,erro:'Escapada 5c: n1 deve ser consonante com CF1'};
         if (!diss(n2,cf1)) return {ok:false,erro:'Escapada 5c: n2 deve ser dissonante com CF1 (escapada)'};
@@ -3088,7 +2953,6 @@ function analisarEscapada(userCP, cantus, fmt5) {
 }
 
 const RITMO_MODELOS = {
-    // 3ª espécie
     'Nota de passagem':        ['a','b','c','d'],
     'Bordadura':               ['a','b','c','d'],
     'Cambiata':                ['a','b','d'],
@@ -3096,13 +2960,10 @@ const RITMO_MODELOS = {
     'Grupo de notas de passagem': ['a','b','c','d'],
     'Nota de passagem acentuada': ['a','b','c','d'],
     'Bordadura acentuada':     ['a','b','c','d'],
-    // 4ª espécie
     'Suspensão':               ['s1','s2'],
     'Retardo':                 ['s1','s2'],
     'Bordadura Superior':      ['np'],
     'Bordadura Inferior':      ['np'],
-    // 5ª espécie — tratamentos herdados das espécies anteriores usam modelos acima
-    // 5ª espécie — tratamentos exclusivos
     'Suspensão com resolução interrompida': ['5d','5e','5f'],
     'Retardo com resolução interrompida':   ['5d','5e','5f'],
     'Apojatura':    ['5b','5c'],
@@ -3111,8 +2972,6 @@ const RITMO_MODELOS = {
 };
 const RITMO_PESOS = { 'a':4, 'b':3, 'c':2, 'd':1, 's1':1, 's2':1, 'np':1,
                       '5a':2, '5b':2, '5c':3, '5d':2, '5e':2, '5f':1 };
-// Fonte única de verdade para ligaduras: modelo rítmico -> [índice da preparação, índice da dissonância ligada]
-// (índices 0-based dentro do array de notas do contraponto). Modelos ausentes aqui não têm ligadura.
 const TIE_PAIR_BY_RITMO = { 's1':[1,2], 's2':[1,2], '5d':[1,2], '5e':[1,2], '5f':[2,3] };
 function getTiePair(ritmoModelo) { return TIE_PAIR_BY_RITMO[ritmoModelo] || null; }
 
@@ -3128,16 +2987,15 @@ function sortearRitmoModelo(tratamento) {
 }
 
 const RITMO_DISPLAY = {
-    'a': '♩ ♩ ♩ ♩ | 𝅜',
+    'a': '♩ ♩ ♩ ♩ | 𝅝',
     'b': '𝄼 ♩ ♩ | ♩ ♩ 𝅗𝅥',
-    'c': '𝄽 ♩ ♩ ♩ | 𝅜',
+    'c': '𝄽 ♩ ♩ ♩ | 𝅝',
     'd': '𝄽 ♩ ♩ ♩ | ♩ ♩ 𝅗𝅥',
     's1': '𝄼 𝅗𝅥‿| 𝅗𝅥 𝅗𝅥',
     's2': '𝅗𝅥 𝅗𝅥‿| 𝅗𝅥 𝅗𝅥',
-    'np': '𝅗𝅥 𝅗𝅥 | 𝅜',
-    // 5ª espécie
-    '5a': '𝅗𝅥. ♩ | 𝅜',
-    '5b': '𝅜 | 𝅗𝅥 𝅗𝅥',
+    'np': '𝅗𝅥 𝅗𝅥 | 𝅝',
+    '5a': '𝅗𝅥. ♩ | 𝅝',
+    '5b': '𝅝 | 𝅗𝅥 𝅗𝅥',
     '5c': '𝅗𝅥. ♩ | ♩ ♩ 𝅗𝅥',
     '5d': '𝅗𝅥 𝅗𝅥‿| ♩ ♩ 𝅗𝅥',
     '5e': '𝅗𝅥. ♩‿| ♩ ♩ 𝅗𝅥',
@@ -3176,7 +3034,6 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
 
     for (let i = 0; i < qtdA; i++) {
         const tratamento = tratamentosParaGerar[i % tratamentosParaGerar.length];
-        // Tipo A
         let parA = null;
         for (let t = 0; t < 40; t++) {
             const isUpperVoice = Math.random() > 0.5;
@@ -3207,7 +3064,6 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
     }
     for (let i = 0; i < qtdB; i++) {
         const tratamento = tratamentosParaGerar[i % tratamentosParaGerar.length];
-        // Tipo B
         let parB = null;
         for (let t = 0; t < 40; t++) {
             const isUpperVoice = Math.random() > 0.5;
@@ -3247,7 +3103,6 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
             const isUpperC = Math.random() > 0.5;
             const testPar = gerarParValido(tratamentoC, isUpperC, 20);
             if (!testPar.success) continue;
-            // Para tipo C o contraponto é do aluno: unicidade só pelo cantus
             const sigC = testPar.cantus.map(n => n.note).join('|');
             if (assinaturasUsadas.has(sigC)) continue;
             assinaturasUsadas.add(sigC);
@@ -3256,7 +3111,6 @@ function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
         }
         if (!parValido) { console.warn(`⚠️ Pulando questão do tipo C com tratamento "${tratamentoC}"`); continue; }
 
-        // Gerar também o contraponto esperado (para mostrar solução no modo Estudo)
         let contrapontoEsperado = null;
         try {
             const parSol = gerarParValido(tratamentoC, parValido.isUpperVoice, 10);
@@ -3388,23 +3242,33 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
                         const isDottedRest = n.duration === 'hdr';
                         const vexRestDur = isDottedRest ? 'hr' : (n.duration || 'qr');
                         const restKey = clef === 'bass' ? 'd/3' : 'b/4';
-                        const rn = new Vex.Flow.StaveNote({ keys: [restKey], duration: vexRestDur, clef: clef });
-                        if (isDottedRest) Vex.Flow.Dot.buildAndAttach([rn], { all_voices: true });
+                        const rn = isDottedRest
+                            ? new Vex.Flow.StaveNote({ keys: [restKey], duration: 'h', dots: 1, clef: clef })
+                            : new Vex.Flow.StaveNote({ keys: [restKey], duration: vexRestDur, clef: clef });
+                        if (isDottedRest) {
+                            Vex.Flow.Dot.buildAndAttach([rn], { all: true });
+                        }
                         return rn;
                     }
                     const stemDir = getStemDirection(n.note, clef);
-                    // mínima com ponto: VexFlow usa duration 'hd'
-                    const vexDur = n.duration === 'hd' ? 'h' : n.duration;
-                    const sn = new Vex.Flow.StaveNote({
+                    if (n.duration === 'hd') {
+                        sn = new Vex.Flow.StaveNote({
+                            keys: [n.note],
+                            duration: 'h',
+                            dots: 1,
+                            clef: clef,
+                            stem_direction: stemDir
+                        });
+                        Vex.Flow.Dot.buildAndAttach([sn], { all: true });
+                        return sn;
+                    }
+                    const vexDur = n.duration;
+                    return new Vex.Flow.StaveNote({
                         keys: [n.note],
                         duration: vexDur,
                         clef: clef,
                         stem_direction: stemDir
                     });
-                    if (n.duration === 'hd') {
-                        Vex.Flow.Dot.buildAndAttach([sn], { all_voices: true });
-                    }
-                    return sn;
                 } catch(e) { return null; }
             }).filter(Boolean);
         }
@@ -3418,7 +3282,6 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             voice.draw(context, stave);
         }
         
-        // Coletar todas as StaveNotes do contraponto (para ligaduras na 4ª espécie)
         const allSnotesCP = [];
         for (let i = 0; i < numCompassos; i++) {
             const notasC = ccantus[i] || [], notasCP = ccp[i] || [];
@@ -3431,8 +3294,6 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
             allSnotesCP.push(...snotesCP);
         }
 
-        // Desenhar ligadura — índices definidos de forma explícita na geração da questão
-        // (contraponto._ritmoModelo), nunca adivinhados pelo formato/duração das notas.
         if (contraponto && contraponto.length >= 2) {
             const rm = contraponto._ritmoModelo || contraponto._ritmoModelo4 || contraponto._ritmoModelo5 || '';
             const par = getTiePair(rm);
@@ -3450,10 +3311,10 @@ function drawScore(cantus, contraponto, cantusPosition = 'superior', cantusClef 
     } catch(e) { console.error('❌ Erro ao desenhar partitura:', e); }
 }
 function bestClef(notes) {
-    const trebleStaffBottom = 67; // B/3
-    const trebleStaffTop = 77;    // F/5
-    const bassStaffBottom = 50;   // D/2
-    const bassStaffTop = 59;      // B/3
+    const trebleStaffBottom = 67;
+    const trebleStaffTop = 77;
+    const bassStaffBottom = 50;
+    const bassStaffTop = 59;
 
     function countLedgerLines(noteMidi, clef) {
         if (clef === 'treble') {
@@ -3475,7 +3336,7 @@ function bestClef(notes) {
 
     let trebleTotal = 0, bassTotal = 0;
     notes.forEach(note => {
-        if (!note.note) return; // skip rests
+        if (!note.note) return;
         const midi = noteToNumber(note.note);
         trebleTotal += countLedgerLines(midi, 'treble');
         bassTotal += countLedgerLines(midi, 'bass');
@@ -3542,7 +3403,7 @@ function updateNotesList() {
     userContraponto.forEach((nota, idx) => {
         const span = document.createElement('span');
         span.className = 'note-item';
-        const durDisplay = { 'w':'𝅜', 'h':'𝅗𝅥', 'q':'♩', '8':'♪', 'hr':'𝄼', 'qr':'𝄽', 'hd':'𝅗𝅥.', 'wr':'𝄻', '8r':'𝄾', 'hdr':'𝄼.' }[nota.duration] || nota.duration;
+        const durDisplay = { 'w':'𝅝', 'h':'𝅗𝅥', 'q':'♩', '8':'♪', 'hr':'𝄼', 'qr':'𝄽', 'hd':'𝅗𝅥.', 'wr':'𝄻', '8r':'𝄾', 'hdr':'𝄼.' }[nota.duration] || nota.duration;
         let label;
         if (nota.note === null) {
             label = `${durDisplay} Pausa`;
@@ -3582,7 +3443,6 @@ function showFeedback(message, isCorrect) {
     setTimeout(() => toast.remove(), 3500);
 }
 function showFeedbackPersistente(message, isCorrect) {
-    // remove qualquer toast persistente anterior
     document.querySelectorAll('.feedback-toast-persistente')
             .forEach(t => t.remove());
 
@@ -3592,8 +3452,6 @@ function showFeedbackPersistente(message, isCorrect) {
     toast.innerHTML = message + '<br><small style="opacity:0.7">(clique em qualquer lugar para fechar)</small>';
     document.body.appendChild(toast);
 
-    // remove no primeiro clique em qualquer lugar (com pequeno delay
-    // para evitar que o próprio clique que disparou o toast o feche)
     setTimeout(() => {
         document.addEventListener('click', () => toast.remove(), { once: true });
     }, 200);
@@ -3611,7 +3469,6 @@ function updateNextButtonText() {
     }
 }
 function handleNextOrValidate() {
-    // Bloqueia se já estiver na última questão respondida
     if (questionAnswered && currentQuestionIndex === questions.length - 1) return;
     const q = questions[currentQuestionIndex];
     
@@ -3627,12 +3484,11 @@ function handleNextOrValidate() {
                 return;
             }
         } else if (currentSpecies === 3) {
-            // Validar pelo ritmoModelo sorteado da questão
             const rm3 = q.ritmoModelo || 'a';
             const lenEsperado3 = { 'a':5, 'b':6, 'c':5, 'd':7 }[rm3] ?? 5;
             const len = userContraponto.length;
             if (len !== lenEsperado3) {
-                const esperado = RITMO_DISPLAY[rm3] || '♩ ♩ ♩ ♩ | 𝅜';
+                const esperado = RITMO_DISPLAY[rm3] || '♩ ♩ ♩ ♩ | 𝅝';
                 showFeedback(`⚠️ 3ª espécie: ${len} nota(s) inserida(s), esperado ${lenEsperado3} para o modelo ${esperado}`, false);
                 return;
             }
@@ -3640,7 +3496,6 @@ function handleNextOrValidate() {
             const qAtual = questions[currentQuestionIndex];
             const rm = qAtual?.ritmoModelo || 'np';
             const len = userContraponto.length;
-            // s1=[hr,h,h,h]=4, s2=[h,h,h,h]=4, np=[h,h,w]=3
             const lenEsperado = (rm === 'np') ? 3 : 4;
             if (len !== lenEsperado) {
                 const esperado = RITMO_DISPLAY[rm] || '';
@@ -3650,7 +3505,6 @@ function handleNextOrValidate() {
         } else if (currentSpecies === 5) {
             const rm = q.ritmoModelo || '5c';
             const len = userContraponto.length;
-            // Mapa de comprimento esperado por modelo rítmico
             const lenMap5 = {
                 '5a':3, '5b':3, '5c':5, '5d':5, '5e':5, '5f':6,
                 'a':5, 'b':6, 'c':5, 'd':7, 's1':4, 's2':4, 'np':3
@@ -3663,7 +3517,6 @@ function handleNextOrValidate() {
             }
         }
         
-        // Toca o contraponto antes de validar
         const nextBtnTmp = document.getElementById('next-btn');
         if (nextBtnTmp) nextBtnTmp.disabled = true;
         activateAudio().then(() => {
@@ -3748,7 +3601,6 @@ function renderCurrentQuestion() {
         drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
     }
 
-    // Mostrar botões de clave sempre que há questão ativa
     atualizarBotoesClave(q.contraClef || (q.partitura?.contraClef) || 'bass');
     
     const pianoDiv = document.getElementById('virtual-piano'); 
@@ -3823,7 +3675,6 @@ function checkAnswer(choice, btn, q) {
         userAnswers[currentQuestionIndex] = choice;
         questionAnswered = true;
 
-        // Pontuação do Desafio
         if (currentModo === 'desafio') {
             desafioSequencia++;
             if (desafioSequencia > desafioMelhorSequencia) desafioMelhorSequencia = desafioSequencia;
@@ -3878,20 +3729,17 @@ function proceedToNext() {
             currentQuestionResponse = null;
             renderCurrentQuestion();
         } else {
-            // Fase concluída
             avancarFaseDesafio();
         }
         return;
     }
 
     if (currentModo === 'estudo') {
-        // No estudo, não avança automaticamente — o aluno pode gerar nova questão
         const nb = document.getElementById('next-btn');
         if (nb) { nb.innerHTML = '⏩ Próxima'; nb.onclick = () => iniciarEstudo(); }
         return;
     }
 
-    // Treino
     if (currentQuestionIndex + 1 < questions.length) { 
         currentQuestionIndex++; 
         currentQuestionResponse = null; 
@@ -3986,7 +3834,6 @@ function generateReport(last) {
     }).join('');
 
     rc.innerHTML = `
-        <!-- CABEÇALHO -->
         <div style="background:#1a1a1a; border-radius:10px; padding:20px 28px; margin-bottom:20px;
                     display:flex; flex-wrap:wrap; gap:20px; align-items:center; justify-content:space-between;
                     border-left:5px solid #3a6ea5;">
@@ -4007,10 +3854,7 @@ function generateReport(last) {
             </div>
         </div>
 
-        <!-- LINHA 2: dois cartões lado a lado -->
         <div style="display:grid; grid-template-columns:1fr 2fr; gap:16px; align-items:start;">
-
-            <!-- Acertos por tipo -->
             <div class="stat-card">
                 <h4>🎯 Acertos por Tipo</h4>
                 <div style="margin-top:12px;">
@@ -4029,7 +3873,6 @@ function generateReport(last) {
                 </div>
             </div>
 
-            <!-- Detalhamento por questão -->
             <div class="stat-card" style="padding:16px;">
                 <h4>🎼 Detalhamento por Questão</h4>
                 <div style="overflow-x:auto; margin-top:10px;">
@@ -4071,13 +3914,10 @@ async function exportPDF() {
 function mudarClaveAtual(clave) {
     const q = questions[currentQuestionIndex];
     if (!q) return;
-    // Atualiza a clave na questão (fonte única de verdade)
     q.contraClef = clave;
     if (q.partitura) q.partitura.contraClef = clave;
-    // Atualizar botões
     document.getElementById('clef-treble')?.classList.toggle('active', clave === 'treble');
     document.getElementById('clef-bass')?.classList.toggle('active', clave === 'bass');
-    // Redesenhar imediatamente
     if (q.tipo === 'a') drawBlankScore(q.cantusPosition, q.cantusClef, q.contraClef);
     else if (q.tipo === 'b') drawScore(q.partitura.cantus, q.partitura.contraponto, q.partitura.cantusPosition, q.partitura.cantusClef, q.partitura.contraClef);
     else if (q.tipo === 'c') drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
@@ -4119,11 +3959,9 @@ function iniciarEstudo() {
     estudoAtivo = true;
     generateRandomTonality();
 
-    // Ocultar container de solução anterior
     const sc = document.getElementById('solucao-container');
     if (sc) sc.style.display = 'none';
 
-    // Gerar 1 questão do tipo e tratamento escolhidos
     const isUpperVoice = Math.random() > 0.5;
     let par = null;
     for (let t = 0; t < 50; t++) {
@@ -4191,8 +4029,6 @@ function iniciarEstudo() {
     renderCurrentQuestion();
 }
 
-// Sorteia o modelo rítmico UMA única vez — usado tanto no enunciado quanto na validação,
-// para que nunca divirjam (bug anterior: cada um sorteava o seu, podendo dar modelos diferentes).
 function sortearRitmoModeloParaTratamento(tratamento, sp) {
     if (sp === 3) return sortearRitmoModelo(tratamento);
     if (sp === 4) return (tratamento === 'Suspensão' || tratamento === 'Retardo') ? sortearRitmoModelo(tratamento) : 'np';
@@ -4211,11 +4047,8 @@ function buildEnunciadoC(tratamento, sp, ritmoModelo) {
     return `Escreva uma dissonância do tipo <strong>"${tratamento}"</strong>:`;
 }
 
-// Estado: quando true, "🔊 Ouvir" toca o exemplo de solução em vez da resposta do aluno.
 let exemploSolucaoAtiva = false;
 
-// Em vez de exibir o exemplo automaticamente, mostra apenas o botão que permite ao
-// aluno optar por vê-lo — a resposta dele continua na partitura principal intocada.
 function ofertarExemploSolucao(q) {
     const sc = document.getElementById('solucao-container');
     const body = document.getElementById('solucao-body');
@@ -4261,8 +4094,6 @@ function mostrarSolucao(cantus, contraponto, cantusPos, cantusClef) {
         rend.resize(totalLargura, 290);
         const ctx2 = rend.getContext();
         ctx2.clear();
-        // Simplified: reutilizar drawScore mas apontando para canvas diferente
-        // Guardar renderer/context globais, trocar, depois restaurar
         const _r = renderer, _c = context;
         renderer = rend; context = ctx2;
         drawScore(cantus, contraponto, cantusPos, cantusClef);
@@ -4360,13 +4191,11 @@ function iniciarFaseDesafio() {
     currentSpecies = fase.especie;
     generateRandomTonality();
 
-    // Gerar questões da fase
     const qtd = fase.questoes;
     const tipoFase = fase.tipo;
     const qtdA = tipoFase === 'a' ? qtd : 0;
     const qtdB = tipoFase === 'b' ? qtd : 0;
     const qtdC = tipoFase === 'c' ? qtd : 0;
-    // Para fase 7: mistura 2ª e 4ª espécie
     if (desafioFaseIdx === 6) {
         const q2 = (() => { currentSpecies = 2; return generateQuestions(0,0,3); })();
         const q4 = (() => { currentSpecies = 4; return generateQuestions(0,0,2); })();
@@ -4396,7 +4225,6 @@ function iniciarFaseDesafio() {
     initPiano();
     renderCurrentQuestion();
 
-    // Iniciar timer
     clearInterval(desafioTimerInterval);
     desafioTimerInterval = setInterval(() => {
         if (desafioPausado) return;
@@ -4435,7 +4263,6 @@ function tempoesgotadoDesafio() {
 
 function avancarFaseDesafio() {
     clearInterval(desafioTimerInterval);
-    // Verificar emblemas
     verificarEmblemas();
     desafioFaseIdx++;
     if (desafioFaseIdx >= DESAFIO_FASES.length) {
@@ -4464,7 +4291,6 @@ function encerrarDesafio(completo) {
     document.getElementById('desafio-start-btn').style.display = '';
     document.getElementById('desafio-reset-btn').style.display = 'none';
 
-    // Relatório do Desafio
     const rc = document.getElementById('report-content');
     const ra = document.getElementById('report-area');
     if (rc && ra) {
@@ -4488,7 +4314,6 @@ function pausarDesafio() {
 
     if (!desafioPausado) {
         if (estaRespondendo) {
-            // Avisar que a resposta será anulada
             const mm = document.getElementById('modal-message');
             if (mm) mm.innerHTML = '⚠️ Se pausar agora, a resposta atual será <strong>anulada</strong>.<br>Deseja pausar e anular, ou continuar sem pausar?';
             const modal = document.getElementById('modal');
@@ -4537,7 +4362,6 @@ function atualizarHUD() {
     }
 }
 
-// Código de retomada
 function gerarCodigoRetomada() {
     const estado = {
         f: desafioFaseIdx,
@@ -4550,7 +4374,6 @@ function gerarCodigoRetomada() {
     };
     const json = JSON.stringify(estado);
     const b64 = btoa(unescape(encodeURIComponent(json)));
-    // Formatar em blocos de 4
     const raw = b64.replace(/[^A-Za-z0-9]/g, '').toUpperCase().substring(0, 20);
     return raw.match(/.{1,4}/g)?.join('-') || raw;
 }
@@ -4587,7 +4410,6 @@ function setModo(modo) {
     document.getElementById('treino-config').style.display  = modo === 'treino'  ? 'flex' : 'none';
     document.getElementById('desafio-config').style.display = modo === 'desafio' ? 'flex' : 'none';
     if (modo === 'estudo') populateEstudoTratamentos();
-    // Resetar questões ao trocar de modo
     questions = []; currentQuestionIndex = 0;
     ocultarBotoesClave();
     const pi = document.getElementById('progress-info');
@@ -4607,7 +4429,6 @@ function setModo(modo) {
 
 // ==================== INICIALIZAÇÃO ====================
 document.addEventListener('keydown', e => {
-    // Ignorar atalhos quando o usuário está digitando em um campo de texto (ex: nome do aluno)
     const tag = (e.target && e.target.tagName || '').toLowerCase();
     const isTyping = tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable);
     if (isTyping) return;
@@ -4637,7 +4458,6 @@ document.addEventListener('keydown', e => {
         e.preventDefault();
     }
 
-    // ── Entrada de notas pelo teclado do computador ──
     if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         const letter = e.key.toLowerCase();
         if (Object.prototype.hasOwnProperty.call(KB_BASE_SEMITONE, letter)) {
@@ -4678,7 +4498,6 @@ document.querySelectorAll('.duration-btn').forEach(btn => {
 const defBtn = document.querySelector('[data-duration="h"]'); if (defBtn) defBtn.classList.add('active');
 document.querySelectorAll('button').forEach(btn => btn.addEventListener('click', activateAudio));
 
-// Botões de treino
 const sb = document.getElementById('start-btn'); if (sb) sb.onclick = startExercise;
 const rb = document.getElementById('reset-btn'); if (rb) rb.onclick = () => {
     if (confirm('Deseja salvar o relatório antes de finalizar?')) {
@@ -4688,19 +4507,16 @@ const rb = document.getElementById('reset-btn'); if (rb) rb.onclick = () => {
 const rpt = document.getElementById('generate-report-btn'); if (rpt) rpt.onclick = exportPDF;
 const clr = document.getElementById('clear-all-notes'); if (clr) clr.onclick = clearAllNotes;
 
-// Botões de estudo
 const esb = document.getElementById('estudo-start-btn'); if (esb) esb.onclick = iniciarEstudo;
 const espSel = document.getElementById('estudo-species');
 if (espSel) { espSel.onchange = populateEstudoTratamentos; populateEstudoTratamentos(); }
 
-// Botões de desafio
 const dsb = document.getElementById('desafio-start-btn'); if (dsb) dsb.onclick = () => iniciarDesafio();
 const drsb = document.getElementById('desafio-reset-btn'); if (drsb) drsb.onclick = () => {
     if (confirm('Abandonar o Desafio?')) { clearInterval(desafioTimerInterval); encerrarDesafio(false); }
 };
 const dretb = document.getElementById('desafio-retomar-btn'); if (dretb) dretb.onclick = retomarDesafio;
 
-// Visibilidade botões de duração
 function updateRestButtonVisibility() {
     const restBtn = document.getElementById('rest-btn');
     const restQrBtn = document.getElementById('rest-qr-btn');
@@ -4717,10 +4533,8 @@ if (speciesSel) speciesSel.addEventListener('change', () => {
 });
 updateRestButtonVisibility();
 
-// Botão salvar progresso (adicionado dinamicamente ao HUD)
 document.getElementById('desafio-pausar-btn')?.addEventListener('click', pausarDesafio);
 
-// Iniciar no modo Estudo
 setModo('estudo');
 initPiano();
 updateKeyboardModeStatus();
@@ -4737,7 +4551,7 @@ if (isFileProtocol) {
 } else {
     setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
 }
-console.log('✅ Sistema de Contraponto carregado - v26.05.4');
+console.log('✅ Sistema de Contraponto carregado - v26.10.3');
 </script>
 </body>
 </html>
