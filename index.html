@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exercícios de Tratamento de Dissonâncias - v26.10.04</title>
+    <title>Exercícios de Tratamento de Dissonâncias - v26.10.18</title>
 
     <!-- BIBLIOTECAS -->
     <script src="./libs/vexflow.js"></script>
@@ -122,7 +122,7 @@
 <div class="container">
     <div class="header">
         <h1>🎵 <span>Tratamentos de Dissonância</span> 🎵</h1>
-        <div class="subtitle">Prof. Rogério Tavares Constante — v26.10.04</div>
+        <div class="subtitle">Prof. Rogério Tavares Constante — v26.10.18</div>
     </div>
 
     <!-- ── ABAS DE MODO ── -->
@@ -148,6 +148,23 @@
             </select>
         </div>
         <span id="audio-status" style="font-size:12px; color:#4da87a;">🎧 Clique em qualquer botão para ativar o áudio</span>
+    </div>
+
+    <!-- ── TRATAMENTOS OPCIONAIS DA 5ª ESPÉCIE ── -->
+    <div class="config-panel" id="opcionais-panel" style="padding-top:12px; padding-bottom:12px;">
+        <div class="config-group" style="flex-wrap:wrap;">
+            <label>➕ Tratamentos opcionais (5ª espécie):</label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:normal; color:#e0e0e0;">
+                <input type="checkbox" id="opt-apojatura"> Apojatura
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:normal; color:#e0e0e0;">
+                <input type="checkbox" id="opt-antecipacao"> Antecipação
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:normal; color:#e0e0e0;">
+                <input type="checkbox" id="opt-escapada"> Escapada
+            </label>
+            <span id="opcionais-aviso" style="font-size:12px; color:#9a9a9a;">Só entram nas questões (e nas alternativas) da 5ª espécie se marcados — inclusive no Desafio.</span>
+        </div>
     </div>
 
     <!-- ── CONFIG MODO ESTUDO ── -->
@@ -738,6 +755,33 @@ const tratamentosPorEspecie = {
         'Suspensão com resolução interrompida', 'Retardo com resolução interrompida',
         'Apojatura', 'Antecipação', 'Escapada']
 };
+// ==================== TRATAMENTOS OPCIONAIS (5ª espécie) ====================
+// Só entram no rol da 5ª espécie se o usuário marcar o checkbox correspondente.
+const TRATAMENTOS_OPCIONAIS_5 = {
+    'Apojatura':   'opt-apojatura',
+    'Antecipação': 'opt-antecipacao',
+    'Escapada':    'opt-escapada'
+};
+function tratamentoPermitido(nome, especie) {
+    if (especie !== 5) return true;
+    const id = TRATAMENTOS_OPCIONAIS_5[nome];
+    if (!id) return true; // tratamento não opcional
+    return !!document.getElementById(id)?.checked;
+}
+function tratamentosAtivos(especie, lista = tratamentosPorEspecie[especie]) {
+    return (lista || []).filter(t => tratamentoPermitido(t, especie));
+}
+function setOpcionaisTravados(travar) {
+    Object.values(TRATAMENTOS_OPCIONAIS_5).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = travar;
+    });
+    const av = document.getElementById('opcionais-aviso');
+    if (av) av.textContent = travar
+        ? '🔒 Travado durante o Desafio.'
+        : 'Só entram nas questões (e nas alternativas) da 5ª espécie se marcados — inclusive no Desafio.';
+}
+
 const tratamentosGeraveis = {
     2: ['Nota de passagem', 'Bordadura Inferior', 'Bordadura Superior'],
     3: [...tratamentosPorEspecie[3]],
@@ -2318,10 +2362,11 @@ function sortearTratamento5aEspecie() {
         ['Suspensão com resolução interrompida', 4], ['Retardo com resolução interrompida', 4],
         ['Apojatura', 5], ['Antecipação', 5], ['Escapada', 5]
     ];
-    const total = pesos.reduce((s,[,p]) => s+p, 0);
+    const pesosAtivos = pesos.filter(([t]) => tratamentoPermitido(t, 5));
+    const total = pesosAtivos.reduce((s,[,p]) => s+p, 0);
     let r = Math.random() * total;
-    for (const [t,p] of pesos) { r -= p; if (r <= 0) return t; }
-    return pesos[pesos.length-1][0];
+    for (const [t,p] of pesosAtivos) { r -= p; if (r <= 0) return t; }
+    return pesosAtivos[pesosAtivos.length-1][0];
 }
 
 const RITMOS_5ESP = {
@@ -3034,12 +3079,12 @@ function gerarInstrucao5aEspecie(tratamento, rm) {
 }
 // ==================== GERAÇÃO DE QUESTÕES ====================
 function generateQuestions(qtdA = 4, qtdB = 4, qtdC = 4) {
-    const tratamentos = [...tratamentosPorEspecie[currentSpecies]];
+    const tratamentos = tratamentosAtivos(currentSpecies);
     const tratamentosParaGerar = currentSpecies === 4
         ? Array.from({length: qtdA + qtdB + qtdC}, () => sortearTratamento4aEspecie())
         : currentSpecies === 5
         ? Array.from({length: qtdA + qtdB + qtdC}, () => sortearTratamento5aEspecie())
-        : embaralhar([...tratamentosGeraveis[currentSpecies]]);
+        : embaralhar(tratamentosAtivos(currentSpecies, tratamentosGeraveis[currentSpecies]));
     const tipoA = [], tipoB = [], tipoC = [];
     const assinaturasUsadas = new Set();
 
@@ -3632,7 +3677,8 @@ function renderCurrentQuestion() {
         notesListDiv.style.pointerEvents = (q.tipo === 'c' && alreadyAnswered) ? 'none' : 'auto';
     }
     
-    const tratamentos = [...tratamentosPorEspecie[currentSpecies]];
+    const tratamentos = tratamentosAtivos(currentSpecies);
+    if (q.resposta && !tratamentos.includes(q.resposta)) tratamentos.push(q.resposta); // segurança: a resposta sempre aparece
     const container = document.getElementById('alternatives-container'); 
     if (!container) return;
     container.innerHTML = '';
@@ -3950,7 +3996,7 @@ function populateEstudoTratamentos() {
     const sel = document.getElementById('estudo-tratamento');
     if (!sel) return;
     sel.innerHTML = '';
-    const lista = tratamentosGeraveis[sp] || tratamentosGeraveis[2];
+    const lista = tratamentosAtivos(sp, tratamentosGeraveis[sp] || tratamentosGeraveis[2]);
     lista.forEach(t => {
         const opt = document.createElement('option');
         opt.value = t; opt.textContent = t;
@@ -4165,6 +4211,7 @@ function iniciarDesafio(fromSave = null) {
 
     currentModo = 'desafio';
     desafioAtivo = true;
+    setOpcionaisTravados(true); // a escolha dos opcionais é validada aqui e vale para todo o Desafio
 
     if (fromSave) {
         desafioFaseIdx    = fromSave.fase;
@@ -4298,6 +4345,7 @@ function verificarEmblemas() {
 function encerrarDesafio(completo) {
     clearInterval(desafioTimerInterval);
     desafioAtivo = false;
+    setOpcionaisTravados(false);
     document.getElementById('desafio-hud').classList.remove('active');
     document.getElementById('desafio-start-btn').style.display = '';
     document.getElementById('desafio-reset-btn').style.display = 'none';
@@ -4521,6 +4569,9 @@ const clr = document.getElementById('clear-all-notes'); if (clr) clr.onclick = c
 const esb = document.getElementById('estudo-start-btn'); if (esb) esb.onclick = iniciarEstudo;
 const espSel = document.getElementById('estudo-species');
 if (espSel) { espSel.onchange = populateEstudoTratamentos; populateEstudoTratamentos(); }
+Object.values(TRATAMENTOS_OPCIONAIS_5).forEach(id => {
+    document.getElementById(id)?.addEventListener('change', populateEstudoTratamentos);
+});
 
 const dsb = document.getElementById('desafio-start-btn'); if (dsb) dsb.onclick = () => iniciarDesafio();
 const drsb = document.getElementById('desafio-reset-btn'); if (drsb) drsb.onclick = () => {
@@ -4562,7 +4613,7 @@ if (isFileProtocol) {
 } else {
     setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
 }
-console.log('✅ Sistema de Contraponto carregado - v26.10.04');
+console.log('✅ Sistema de Contraponto carregado - v26.10.18');
 </script>
 </body>
 </html>
