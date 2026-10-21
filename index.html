@@ -209,10 +209,13 @@
             <span id="tonality-display" style="color:#3a6ea5; font-weight:bold;">Aleatório ao iniciar</span>
         </div>
         <div class="config-group">
-            <label>Questões:</label>
-            <select id="treino-qtd-a"><option value="3">3 auditivas</option><option value="5" selected>5 auditivas</option></select>
-            <select id="treino-qtd-b"><option value="3">3 análise</option><option value="5" selected>5 análise</option></select>
-            <select id="treino-qtd-c"><option value="3">3 escrita</option><option value="5" selected>5 escrita</option></select>
+            <label>Questões (0–10):</label>
+            <label style="display:flex; align-items:center; gap:6px; font-weight:normal; color:#e0e0e0;">✏️ Escrita
+                <input type="number" id="treino-qtd-c" min="0" max="10" step="1" value="5" style="width:56px;"></label>
+            <label style="display:flex; align-items:center; gap:6px; font-weight:normal; color:#e0e0e0;">👁️ Análise
+                <input type="number" id="treino-qtd-b" min="0" max="10" step="1" value="5" style="width:56px;"></label>
+            <label style="display:flex; align-items:center; gap:6px; font-weight:normal; color:#e0e0e0;">🔊 Auditiva
+                <input type="number" id="treino-qtd-a" min="0" max="10" step="1" value="5" style="width:56px;"></label>
         </div>
         <button class="success" id="start-btn">▶ INICIAR TREINO</button>
         <button id="generate-report-btn" disabled>📊 RELATÓRIO PDF</button>
@@ -4163,6 +4166,19 @@ function startExercise() {
     const nomeInput = document.getElementById('student-name');
     if (!nomeInput?.value.trim()) { alert('Por favor, digite seu nome!'); return; }
     
+    const lerQtd = id => {
+        const el = document.getElementById(id);
+        let v = parseInt(el?.value, 10);
+        if (isNaN(v)) v = 0;
+        v = Math.max(0, Math.min(10, v));
+        if (el) el.value = v;
+        return v;
+    };
+    const qtdA = lerQtd('treino-qtd-a');
+    const qtdB = lerQtd('treino-qtd-b');
+    const qtdC = lerQtd('treino-qtd-c');
+    if (qtdA + qtdB + qtdC === 0) { alert('Escolha pelo menos 1 questão (de 0 a 10 por tipo).'); return; }
+
     currentModo = 'treino';
     currentSpecies = parseInt(document.getElementById('species-select')?.value || '2');
     const ss = document.getElementById('species-select');
@@ -4170,9 +4186,6 @@ function startExercise() {
 
     generateRandomTonality();
 
-    const qtdA = parseInt(document.getElementById('treino-qtd-a')?.value || '5');
-    const qtdB = parseInt(document.getElementById('treino-qtd-b')?.value || '5');
-    const qtdC = parseInt(document.getElementById('treino-qtd-c')?.value || '5');
     questions = generateQuestions(qtdA, qtdB, qtdC);
     
     if (questions.length === 0) { 
