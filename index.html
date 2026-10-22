@@ -346,10 +346,14 @@ const samplers = { piano: null, cordas: null };
 // 'notas': [nome usado no Sampler, [nomes possíveis no arquivo]] — para as notas pretas
 // aceita-se sustenido ou bemol. Amostras que não existirem são simplesmente ignoradas;
 // o Sampler transpõe as amostras vizinhas para cobrir as notas que faltarem.
+// 'sobreposicao' (segundos): quanto o final de cada nota é prolongado sobre o ataque da seguinte,
+//   na mesma voz. 0 = sem sobreposição; valores maiores = legato mais ligado.
+// 'release' (segundos): tempo de decaimento depois que a nota é solta (a "cauda" que se
+//   mistura ao ataque da nota seguinte). Aumente junto com a sobreposição para um legato mais suave.
 const INSTRUMENTOS_AMOSTRAS = {
-    piano:  { rotulo: 'Piano',  pasta: 'audios/piano/',  sufixo: 'v8',  ext: 'mp3', oitavas: [2,3,4,5,6],
+    piano:  { rotulo: 'Piano',  pasta: 'audios/piano/',  sufixo: 'v8',  ext: 'mp3', oitavas: [2,3,4,5,6], sobreposicao: 0.05, release: 0.3,
               notas: [['C',['C']], ['D#',['D#']], ['F#',['F#']], ['A',['A']]] },
-    cordas: { rotulo: 'Cordas', pasta: 'audios/cordas/', sufixo: '_ff', ext: 'wav', oitavas: [0,1,2,3,4,5,6],
+    cordas: { rotulo: 'Cordas', pasta: 'audios/cordas/', sufixo: '_ff', ext: 'wav', oitavas: [0,1,2,3,4,5,6], sobreposicao: 0.15, release: 0.6,
               notas: [['C',['C']], ['D#',['D#','Eb']], ['F#',['F#','Gb']], ['A',['A']]] }
 };
 const INSTRUMENTOS_SAMPLER = Object.keys(INSTRUMENTOS_AMOSTRAS);
@@ -439,7 +443,7 @@ async function carregarAmostras(id) {
         setAudioStatus(`⚠️ ${cfg.rotulo}: amostras não encontradas em ${cfg.pasta}`, true);
         return;
     }
-    samplers[id] = new Tone.Sampler({ urls: Object.fromEntries(ok) }).connect(toneReverb);
+    samplers[id] = new Tone.Sampler({ urls: Object.fromEntries(ok), release: cfg.release ?? 0.3 }).connect(toneReverb);
     console.log(`${cfg.rotulo}: ${ok.length} amostras carregadas de ${cfg.pasta}`);
     setAudioStatus(`${id === 'piano' ? '🎹' : '🎻'} ${cfg.rotulo} carregado (${ok.length} amostras)! 🎵`);
 }
@@ -709,6 +713,7 @@ async function playScoreTone(cantus, contraponto) {
 
         if (isSampler(instrumentType)) {
             const smp = samplers[instrumentType];
+            const sobrepor = INSTRUMENTOS_AMOSTRAS[instrumentType].sobreposicao || 0;
             if (!smp || !smp.loaded) {
                 setAudioStatus("⏳ Aguarde — amostras ainda carregando...", true);
                 return;
@@ -717,7 +722,7 @@ async function playScoreTone(cantus, contraponto) {
             (cantus || []).forEach(n => {
                 const dur = durMap[n.duration] || 1;
                 const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
-                smp.triggerAttackRelease(noteName, dur * 1.05, humanizeTime(now + tC), humanizeVelocity());
+                smp.triggerAttackRelease(noteName, dur + sobrepor, humanizeTime(now + tC), humanizeVelocity());
                 tC += dur;
             });
             let tCP = 0;
@@ -725,7 +730,7 @@ async function playScoreTone(cantus, contraponto) {
                 const dur = durMap[n.duration] || 1;
                 if (n.note !== null) {
                     const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
-                    smp.triggerAttackRelease(noteName, dur * 1.05, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
+                    smp.triggerAttackRelease(noteName, dur + sobrepor, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
                 }
                 tCP += dur;
             });
