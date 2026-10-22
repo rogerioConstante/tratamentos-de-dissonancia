@@ -141,10 +141,9 @@
         <div class="config-group">
             <label>🎹 Instrumento:</label>
             <select id="instrument-select">
-                <option value="fm">🎹 Piano (FM)</option>
-                <option value="am">🎻 Cordas (AM)</option>
+                <option value="piano" selected>🎹 Piano</option>
+                <option value="cordas">🎻 Cordas</option>
                 <option value="synth">🎚️ Synth</option>
-                <option value="sampler" selected>🎹 Piano Real</option>
             </select>
         </div>
         <span id="audio-status" style="font-size:12px; color:#4da87a;">🎧 Clique em qualquer botão para ativar o áudio</span>
@@ -339,7 +338,22 @@ let synthCantus = null;
 let synthCP = null;
 let toneReverb = null;
 let toneChorus = null;
-let samplerPiano = null;
+const samplers = { piano: null, cordas: null };
+
+// ── Instrumentos de amostras ──────────────────────────────────────────────
+// Cada instrumento tem a sua pasta, prefixo/sufixo de nome e extensão.
+// Nome do arquivo = <pasta><nota><oitava><sufixo>.<ext>   ex.: audios/piano/A2v8.mp3, audios/cordas/A2_ff.wav
+// 'notas': [nome usado no Sampler, [nomes possíveis no arquivo]] — para as notas pretas
+// aceita-se sustenido ou bemol. Amostras que não existirem são simplesmente ignoradas;
+// o Sampler transpõe as amostras vizinhas para cobrir as notas que faltarem.
+const INSTRUMENTOS_AMOSTRAS = {
+    piano:  { rotulo: 'Piano',  pasta: 'audios/piano/',  sufixo: 'v8',  ext: 'mp3', oitavas: [2,3,4,5,6],
+              notas: [['C',['C']], ['D#',['D#']], ['F#',['F#']], ['A',['A']]] },
+    cordas: { rotulo: 'Cordas', pasta: 'audios/cordas/', sufixo: '_ff', ext: 'wav', oitavas: [0,1,2,3,4,5,6],
+              notas: [['C',['C']], ['D#',['D#','Eb']], ['F#',['F#','Gb']], ['A',['A']]] }
+};
+const INSTRUMENTOS_SAMPLER = Object.keys(INSTRUMENTOS_AMOSTRAS);
+const isSampler = t => INSTRUMENTOS_SAMPLER.includes(t);
 
 // Abrir o arquivo diretamente (duplo-clique, file://) bloqueia o carregamento
 // das amostras de áudio por política de segurança do navegador (CORS).
@@ -380,11 +394,11 @@ async function initToneAdvanced() {
             // Sem servidor HTTP, o navegador bloqueia (CORS) o fetch dos .mp3
             // mesmo que o arquivo exista no disco. Não adianta tentar de novo:
             // é preciso servir a pasta (ver instruções no console) ou usar
-            // um dos instrumentos sintetizados (FM/AM/Synth).
+            // o instrumento sintetizado (Synth).
             console.warn(
-                '🎹 Piano Real (amostras) desativado: a página foi aberta como arquivo local (file://).\n' +
+                '🎹 Instrumentos de amostras (Piano/Cordas) desativados: a página foi aberta como arquivo local (file://).\n' +
                 'Os navegadores bloqueiam o carregamento de áudio por CORS nesse modo.\n' +
-                'Para usar o Piano Real, sirva esta pasta por HTTP, por exemplo:\n' +
+                'Para usar Piano e Cordas, sirva esta pasta por HTTP, por exemplo:\n' +
                 '  python3 -m http.server 8000\n' +
                 'e depois abra http://localhost:8000/ (em vez de abrir o .html direto).\n' +
                 'Alternativa: use a extensão "Live Server" do VS Code.'
@@ -393,34 +407,8 @@ async function initToneAdvanced() {
             return;
         }
 
-        // Carrega o Sampler em paralelo, sem bloquear os outros instrumentos
-        const amostras = {
-            'C2':'audios/C2v8.mp3',
-            'D#2':'audios/D#2v8.mp3',
-            'F#2':'audios/F#2v8.mp3',
-            'A2':'audios/A2v8.mp3',
-            'C3':'audios/C3v8.mp3',
-            'D#3':'audios/D#3v8.mp3',
-            'F#3':'audios/F#3v8.mp3',
-            'A3':'audios/A3v8.mp3',
-            'C4':'audios/C4v8.mp3',
-            'D#4':'audios/D#4v8.mp3',
-            'F#4':'audios/F#4v8.mp3',
-            'A4':'audios/A4v8.mp3',
-            'C5':'audios/C5v8.mp3',
-            'D#5':'audios/D#5v8.mp3',
-            'F#5':'audios/F#5v8.mp3',
-            'A5':'audios/A5v8.mp3',
-            'C6':'audios/C6v8.mp3',
-            'D#6':'audios/D#6v8.mp3',
-            'F#6':'audios/F#6v8.mp3',
-            'A6':'audios/A6v8.mp3',
-        };
-        samplerPiano = new Tone.Sampler({
-            urls: amostras,
-            onload: () => setAudioStatus("🎹 Piano Real carregado! 🎵"),
-            onerror: (e) => console.warn('Sampler: erro ao carregar amostra', e)
-        }).connect(toneReverb);
+        // Carrega os samplers em paralelo, sem bloquear os outros instrumentos
+        INSTRUMENTOS_SAMPLER.forEach(id => carregarAmostras(id));
 
     } catch (e) {
         console.error('Erro ao iniciar Tone.js:', e);
@@ -429,17 +417,43 @@ async function initToneAdvanced() {
     }
 }
 
+async function carregarAmostras(id) {
+    const cfg = INSTRUMENTOS_AMOSTRAS[id];
+    const tarefas = [];
+    for (const oit of cfg.oitavas) {
+        for (const [chave, aliases] of cfg.notas) {
+            tarefas.push((async () => {
+                for (const nome of aliases) {
+                    try {
+                        const buf = await Tone.ToneAudioBuffer.fromUrl(`${cfg.pasta}${nome}${oit}${cfg.sufixo}.${cfg.ext}`);
+                        return [chave + oit, buf];
+                    } catch (e) { /* arquivo inexistente: tenta o próximo nome */ }
+                }
+                return null;
+            })());
+        }
+    }
+    const ok = (await Promise.all(tarefas)).filter(Boolean);
+    if (!ok.length) {
+        console.warn(`${cfg.rotulo}: nenhuma amostra encontrada em ${cfg.pasta} (padrão <nota><oitava>${cfg.sufixo}.${cfg.ext}).`);
+        setAudioStatus(`⚠️ ${cfg.rotulo}: amostras não encontradas em ${cfg.pasta}`, true);
+        return;
+    }
+    samplers[id] = new Tone.Sampler({ urls: Object.fromEntries(ok) }).connect(toneReverb);
+    console.log(`${cfg.rotulo}: ${ok.length} amostras carregadas de ${cfg.pasta}`);
+    setAudioStatus(`${id === 'piano' ? '🎹' : '🎻'} ${cfg.rotulo} carregado (${ok.length} amostras)! 🎵`);
+}
+
 function disableSamplerOption() {
     const sel = document.getElementById('instrument-select');
     if (!sel) return;
-    const samplerOpt = Array.from(sel.options).find(o => o.value === 'sampler');
-    if (samplerOpt) {
-        samplerOpt.disabled = true;
-        samplerOpt.textContent = '🎹 Piano Real (requer servidor local)';
-    }
-    if (sel.value === 'sampler') {
-        sel.value = 'fm';
-        setAudioStatus("⚠️ Piano Real indisponível offline — usando Piano (FM). Veja o console para instruções.", true);
+    Array.from(sel.options).filter(o => isSampler(o.value)).forEach(o => {
+        o.disabled = true;
+        o.textContent += ' (requer servidor local)';
+    });
+    if (isSampler(sel.value)) {
+        sel.value = 'synth';
+        setAudioStatus("⚠️ Instrumentos de amostras indisponíveis offline — usando Synth. Veja o console para instruções.", true);
     }
 }
 
@@ -463,10 +477,11 @@ async function playNotePreview(midiNote, duration = 0.5) {
         if (!toneReady) await initToneAdvanced();
         const now = Tone.now();
         const noteName = Tone.Frequency(midiNote, "midi").toNote();
-        const instrumentType = document.getElementById('instrument-select')?.value || 'sampler';
-        if (instrumentType === 'sampler') {
-            if (samplerPiano && samplerPiano.loaded) {
-                samplerPiano.triggerAttackRelease(noteName, duration, now, 0.7);
+        const instrumentType = document.getElementById('instrument-select')?.value || 'piano';
+        if (isSampler(instrumentType)) {
+            const smp = samplers[instrumentType];
+            if (smp && smp.loaded) {
+                smp.triggerAttackRelease(noteName, duration, now, 0.7);
             } else if (synthCP) {
                 synthCP.triggerAttackRelease(noteName, duration, now, 0.7); // fallback (amostras indisponíveis)
             }
@@ -638,7 +653,7 @@ async function playScoreTone(cantus, contraponto) {
 
         const now = Tone.now();
         const durMap = { 'w': 2.0, 'h': 1.0, 'q': 0.5, '8': 0.25, 'hr': 1.0, 'qr': 0.5, 'hd': 1.5, 'wr': 2.0, '8r': 0.25, 'hdr': 1.5 };
-        const instrumentType = document.getElementById('instrument-select')?.value || 'fm';
+        const instrumentType = document.getElementById('instrument-select')?.value || 'piano';
 
         // ── Fundir notas ligadas (prep + diss → uma nota de duração somada) ──
         // Usa o mesmo par de índices explícito gravado na geração da questão (ver TIE_PAIR_BY_RITMO),
@@ -668,9 +683,9 @@ async function playScoreTone(cantus, contraponto) {
 
         const contrapontoPlayback = resolverLigadura(contraponto);
 
-        if (instrumentType === 'sampler' && isFileProtocol) {
+        if (isSampler(instrumentType) && isFileProtocol) {
             // Amostras nunca vão carregar em file:// — toca com FM em vez de travar mudo.
-            setAudioStatus("⚠️ Piano Real indisponível offline — tocando com Piano (FM).", true);
+            setAudioStatus("⚠️ Amostras indisponíveis offline — tocando com Synth.", true);
             synthCantus.set({ harmonicity: 2, modulationIndex: 3 });
             synthCP.set({ harmonicity: 1.5, modulationIndex: 2 });
             let tC0 = 0;
@@ -692,8 +707,9 @@ async function playScoreTone(cantus, contraponto) {
             return;
         }
 
-        if (instrumentType === 'sampler') {
-            if (!samplerPiano || !samplerPiano.loaded) {
+        if (isSampler(instrumentType)) {
+            const smp = samplers[instrumentType];
+            if (!smp || !smp.loaded) {
                 setAudioStatus("⏳ Aguarde — amostras ainda carregando...", true);
                 return;
             }
@@ -701,7 +717,7 @@ async function playScoreTone(cantus, contraponto) {
             (cantus || []).forEach(n => {
                 const dur = durMap[n.duration] || 1;
                 const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
-                samplerPiano.triggerAttackRelease(noteName, dur * 1.05, humanizeTime(now + tC), humanizeVelocity());
+                smp.triggerAttackRelease(noteName, dur * 1.05, humanizeTime(now + tC), humanizeVelocity());
                 tC += dur;
             });
             let tCP = 0;
@@ -709,21 +725,14 @@ async function playScoreTone(cantus, contraponto) {
                 const dur = durMap[n.duration] || 1;
                 if (n.note !== null) {
                     const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
-                    samplerPiano.triggerAttackRelease(noteName, dur * 1.05, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
+                    smp.triggerAttackRelease(noteName, dur * 1.05, humanizeTime(now + tCP), humanizeVelocity() * 0.9);
                 }
                 tCP += dur;
             });
             return;
         }
 
-        if (instrumentType === 'fm') {
-            synthCantus.set({ harmonicity: 2, modulationIndex: 3 });
-            synthCP.set({ harmonicity: 1.5, modulationIndex: 2 });
-        } else if (instrumentType === 'am') {
-            synthCantus.set({ harmonicity: 1, modulationIndex: 1 });
-        } else {
-            synthCantus.set({ harmonicity: 3, modulationIndex: 4 });
-        }
+        synthCantus.set({ harmonicity: 3, modulationIndex: 4 });
 
         let tC = 0;
         (cantus || []).forEach(n => {
@@ -4622,7 +4631,7 @@ if (togglePianoVisual) {
 }
 if (isFileProtocol) {
     disableSamplerOption();
-    setAudioStatus("🎧 Clique para ativar o áudio (Piano Real requer servidor local — veja o console)");
+    setAudioStatus("🎧 Clique para ativar o áudio (Piano e Cordas requerem servidor local — veja o console)");
 } else {
     setAudioStatus("🎧 Clique em qualquer botão para ativar o áudio");
 }
