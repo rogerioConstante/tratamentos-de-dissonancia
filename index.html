@@ -355,7 +355,7 @@ const samplers = { piano: null, cordas: null };
 const INSTRUMENTOS_AMOSTRAS = {
     piano:  { rotulo: 'Piano',  pasta: 'audios/piano/',  sufixo: 'v8',  ext: 'mp3', oitavas: [2,3,4,5,6], sobreposicao: 0.05, release: 0.3, ganho: 0,
               notas: [['C',['C']], ['D#',['D#']], ['F#',['F#']], ['A',['A']]] },
-    cordas: { rotulo: 'Cordas', pasta: 'audios/cordas/', sufixo: '_ff', ext: 'wav', oitavas: [0,1,2,3,4,5,6], sobreposicao: 0.15, release: 0.5, ganho: -9,
+    cordas: { rotulo: 'Cordas', pasta: 'audios/cordas/', sufixo: '_ff', ext: 'wav', oitavas: [0,1,2,3,4,5,6], sobreposicao: 0.15, release: 0.5, ganho: -6,
               notas: [['C',['C']], ['D#',['D#','Eb']], ['F#',['F#','Gb']], ['A',['A']]] }
 };
 const INSTRUMENTOS_SAMPLER = Object.keys(INSTRUMENTOS_AMOSTRAS);
@@ -382,7 +382,7 @@ async function initToneAdvanced() {
         setAudioStatus("🎧 Áudio ativado! ✅");
 
         toneReverb = new Tone.Reverb({ decay: 3.5, wet: 0.35 }).toDestination();
-        toneChorus = new Tone.Chorus(4, 2.5, 0.02).connect(toneReverb).start();
+        toneChorus = new Tone.Chorus(4, 2.5, 0.03).connect(toneReverb).start();
 
         synthCantus = new Tone.PolySynth(Tone.FMSynth, {
             harmonicity: 2, modulationIndex: 3,
@@ -2471,17 +2471,21 @@ function gerarContraponto5aEspecie(tratamento, cantusNotes, isUpperVoice) {
             const prepNum = noteToNumber(prep);
             if (!cons(prep,cf1)) continue;
             if (!diss(prep,cf2)) continue;
+            // Schoenberg: a resolução é por grau a partir da NOTA DISSONANTE (prep, sustentada),
+            // na direção da espécie; a nota de interrupção apenas adia essa resolução.
+            const n5 = scaleStep(prep, dirRes);
+            if (!n5 || !inScale(n5)) continue;
+            if (!cons(n5,cf2)) continue;
+            if (!isStep(prep,n5)) continue;
+            if (!noCross(n5,cf2)) continue;
+            const n5Num = noteToNumber(n5);
             for (const n4 of embaralhar([...cands2])) {
                 if (!cons(n4,cf2)) continue;
-                const saltoN3N4 = Math.abs(noteToNumber(n4) - prepNum);
-                if (saltoN3N4 <= 2) continue;
-                if (!isLeapPermitido(prep,n4,null)) continue;
+                const n4Num = noteToNumber(n4);
+                if (n4Num === n5Num) continue;                 // senão não há interrupção
+                if (Math.abs(n4Num - prepNum) > 7) continue;   // dissonância→interrupção: até 5ª justa (salto não obrigatório)
+                if (!isLeapPermitido(n4,n5,null)) continue;    // interrupção→resolução: sem saltos além de 5ª justa
                 if (!noCross(n4,cf2)) continue;
-                const n5 = scaleStep(n4, dirRes);
-                if (!n5 || !inScale(n5)) continue;
-                if (!cons(n5,cf2)) continue;
-                if (!isStep(n4,n5)) continue;
-                if (!noCross(n5,cf2)) continue;
                 const rm = ['5d','5e','5f'][Math.floor(Math.random()*3)];
                 let n1cands;
                 if (rm === '5f') {
@@ -2893,8 +2897,9 @@ function analisarSriRri(userCP, cantus, tratamento, fmt5, dirEsp) {
         if (noteToNumber(n2)!==noteToNumber(n3)) return {ok:false,erro:`${label} 5d: n3 deve ser a mesma nota que n2 (ligada por barra)`};
         if (!diss(n3,cf2)) return {ok:false,erro:`${label} 5d: n3 (sustentada) deve ser dissonante com CF2`};
         if (!cons(n4,cf2)) return {ok:false,erro:`${label} 5d: interrupção (n4) deve ser consonante com CF2`};
-        //if (isStep(n3,n4)) return {ok:false,erro:`${label} 5d: n4 (interrupção) deve ser alcançada por salto a partir de n3`};
+        if (Math.abs(noteToNumber(n4)-noteToNumber(n3))>7) return {ok:false,erro:`${label} 5d: a interrupção (n4) não pode estar a mais de uma 5ª justa da dissonância (n3)`};
         if (!cons(n5,cf2)) return {ok:false,erro:`${label} 5d: resolução (n5) deve ser consonante com CF2`};
+        if (noteToNumber(n4)===noteToNumber(n5)) return {ok:false,erro:`${label} 5d: a interrupção (n4) deve ser diferente da resolução (n5)`};
         if (!isStep(n3,n5)) return {ok:false,erro:`${label} 5d: resolução (n5) deve ser por grau conjunto a partir da dissonância (n3), não de n4`};
         const dir=Math.sign(noteToNumber(n5)-noteToNumber(n3));
         if(dirEsp===-1&&dir!==dirEsp) return {ok:false,erro:`Sri: resolução deve descer a partir da dissonância`};
@@ -2908,8 +2913,9 @@ function analisarSriRri(userCP, cantus, tratamento, fmt5, dirEsp) {
         if (noteToNumber(n2)!==noteToNumber(n3)) return {ok:false,erro:`${label} 5e: n3 deve ser a mesma nota que n2 (ligada)`};
         if (!diss(n3,cf2)) return {ok:false,erro:`${label} 5e: n3 deve ser dissonante com CF2`};
         if (!cons(n4,cf2)) return {ok:false,erro:`${label} 5e: interrupção (n4) deve ser consonante com CF2`};
-        //if (isStep(n3,n4)) return {ok:false,erro:`${label} 5e: n4 deve ser alcançada por salto a partir de n3`};
+        if (Math.abs(noteToNumber(n4)-noteToNumber(n3))>7) return {ok:false,erro:`${label} 5e: a interrupção (n4) não pode estar a mais de uma 5ª justa da dissonância (n3)`};
         if (!cons(n5,cf2)) return {ok:false,erro:`${label} 5e: resolução (n5) deve ser consonante com CF2`};
+        if (noteToNumber(n4)===noteToNumber(n5)) return {ok:false,erro:`${label} 5e: a interrupção (n4) deve ser diferente da resolução (n5)`};
         if (!isStep(n3,n5)) return {ok:false,erro:`${label} 5e: resolução (n5) deve ser por grau a partir de n3`};
         const dir=Math.sign(noteToNumber(n5)-noteToNumber(n3));
         if(dirEsp===-1&&dir!==dirEsp) return {ok:false,erro:`Sri: resolução deve descer`};
@@ -2924,8 +2930,9 @@ function analisarSriRri(userCP, cantus, tratamento, fmt5, dirEsp) {
         if (noteToNumber(n3)!==noteToNumber(n4)) return {ok:false,erro:`${label} 5f: n4 deve ser a mesma nota que n3 (ligada)`};
         if (!diss(n4,cf2)) return {ok:false,erro:`${label} 5f: n4 deve ser dissonante com CF2`};
         if (!cons(n5,cf2)) return {ok:false,erro:`${label} 5f: interrupção (n5) deve ser consonante com CF2`};
-        //if (isStep(n4,n5)) return {ok:false,erro:`${label} 5f: n5 deve ser alcançada por salto a partir de n4`};
+        if (Math.abs(noteToNumber(n5)-noteToNumber(n4))>7) return {ok:false,erro:`${label} 5f: a interrupção (n5) não pode estar a mais de uma 5ª justa da dissonância (n4)`};
         if (!cons(n6,cf2)) return {ok:false,erro:`${label} 5f: resolução (n6) deve ser consonante com CF2`};
+        if (noteToNumber(n5)===noteToNumber(n6)) return {ok:false,erro:`${label} 5f: a interrupção (n5) deve ser diferente da resolução (n6)`};
         if (!isStep(n4,n6)) return {ok:false,erro:`${label} 5f: resolução (n6) deve ser por grau a partir de n4 (dissonância)`};
         const dir=Math.sign(noteToNumber(n6)-noteToNumber(n4));
         if(dirEsp===-1&&dir!==dirEsp) return {ok:false,erro:`Sri: resolução deve descer`};
@@ -3088,8 +3095,8 @@ function gerarInstrucao5aEspecie(tratamento, rm) {
         'Bordadura acentuada': 'Dissonância no tempo forte, volta à nota de preparação.',
         'Suspensão': 'Prepare no c1, sustente ligada como diss. no c2, resolva por grau descendente.',
         'Retardo': 'Prepare no c1, sustente ligada como diss. no c2, resolva por grau ascendente.',
-        'Suspensão com resolução interrompida': 'Prepare e sustente; a resolução descendente é interrompida por salto consonante, depois retoma o grau descendente.',
-        'Retardo com resolução interrompida': 'Prepare e sustente; a resolução ascendente é interrompida por salto consonante, depois retoma o grau ascendente.',
+        'Suspensão com resolução interrompida': 'Prepare e sustente; a resolução descendente é adiada por um movimento para uma nota consonante, depois retoma o grau descendente (a contar da nota dissonante).',
+        'Retardo com resolução interrompida': 'Prepare e sustente; a resolução ascendente é adiada por um movimento para uma nota consonante, depois retoma o grau ascendente (a contar da nota dissonante).',
         'Apojatura': 'Dissonância no tempo forte alcançada por <strong>salto</strong>; resolve por grau conjunto.',
         'Antecipação': 'A nota do próximo tempo forte é antecipada como dissonância no tempo fraco e repetida consonante.',
         'Escapada': 'Dissonância no tempo fraco por grau; resolve no tempo forte por <strong>salto</strong> na direção oposta.',
