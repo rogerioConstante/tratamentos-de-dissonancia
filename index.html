@@ -348,12 +348,14 @@ const samplers = { piano: null, cordas: null };
 // o Sampler transpõe as amostras vizinhas para cobrir as notas que faltarem.
 // 'sobreposicao' (segundos): quanto o final de cada nota é prolongado sobre o ataque da seguinte,
 //   na mesma voz. 0 = sem sobreposição; valores maiores = legato mais ligado.
+// 'ganho' (dB): ajuste de volume do instrumento, para equilibrar um com o outro.
+//   0 = sem alteração; negativo = mais baixo (-6 dB ≈ metade da amplitude); positivo = mais alto.
 // 'release' (segundos): tempo de decaimento depois que a nota é solta (a "cauda" que se
 //   mistura ao ataque da nota seguinte). Aumente junto com a sobreposição para um legato mais suave.
 const INSTRUMENTOS_AMOSTRAS = {
-    piano:  { rotulo: 'Piano',  pasta: 'audios/piano/',  sufixo: 'v8',  ext: 'mp3', oitavas: [2,3,4,5,6], sobreposicao: 0.05, release: 0.3,
+    piano:  { rotulo: 'Piano',  pasta: 'audios/piano/',  sufixo: 'v8',  ext: 'mp3', oitavas: [2,3,4,5,6], sobreposicao: 0.05, release: 0.3, ganho: 0,
               notas: [['C',['C']], ['D#',['D#']], ['F#',['F#']], ['A',['A']]] },
-    cordas: { rotulo: 'Cordas', pasta: 'audios/cordas/', sufixo: '_ff', ext: 'wav', oitavas: [0,1,2,3,4,5,6], sobreposicao: 0.15, release: 0.6,
+    cordas: { rotulo: 'Cordas', pasta: 'audios/cordas/', sufixo: '_ff', ext: 'wav', oitavas: [0,1,2,3,4,5,6], sobreposicao: 0.15, release: 0.5, ganho: -9,
               notas: [['C',['C']], ['D#',['D#','Eb']], ['F#',['F#','Gb']], ['A',['A']]] }
 };
 const INSTRUMENTOS_SAMPLER = Object.keys(INSTRUMENTOS_AMOSTRAS);
@@ -379,8 +381,8 @@ async function initToneAdvanced() {
         await Tone.start();
         setAudioStatus("🎧 Áudio ativado! ✅");
 
-        toneReverb = new Tone.Reverb({ decay: 2.5, wet: 0.25 }).toDestination();
-        toneChorus = new Tone.Chorus(4, 2.5, 0.2).connect(toneReverb).start();
+        toneReverb = new Tone.Reverb({ decay: 3.5, wet: 0.35 }).toDestination();
+        toneChorus = new Tone.Chorus(4, 2.5, 0.02).connect(toneReverb).start();
 
         synthCantus = new Tone.PolySynth(Tone.FMSynth, {
             harmonicity: 2, modulationIndex: 3,
@@ -443,7 +445,7 @@ async function carregarAmostras(id) {
         setAudioStatus(`⚠️ ${cfg.rotulo}: amostras não encontradas em ${cfg.pasta}`, true);
         return;
     }
-    samplers[id] = new Tone.Sampler({ urls: Object.fromEntries(ok), release: cfg.release ?? 0.3 }).connect(toneReverb);
+    samplers[id] = new Tone.Sampler({ urls: Object.fromEntries(ok), release: cfg.release ?? 0.3, volume: cfg.ganho ?? 0 }).connect(toneReverb);
     console.log(`${cfg.rotulo}: ${ok.length} amostras carregadas de ${cfg.pasta}`);
     setAudioStatus(`${id === 'piano' ? '🎹' : '🎻'} ${cfg.rotulo} carregado (${ok.length} amostras)! 🎵`);
 }
@@ -704,7 +706,7 @@ async function playScoreTone(cantus, contraponto) {
                 const dur = durMap[n.duration] || 1;
                 if (n.note !== null) {
                     const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
-                    synthCP.triggerAttackRelease(noteName, dur * 0.95, humanizeTime(now + tCP0), humanizeVelocity() * 0.9);
+                    synthCP.triggerAttackRelease(noteName, dur * 0.95, humanizeTime(now + tCP0), humanizeVelocity());
                 }
                 tCP0 += dur;
             });
