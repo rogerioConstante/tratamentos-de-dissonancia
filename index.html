@@ -381,8 +381,8 @@ async function initToneAdvanced() {
         await Tone.start();
         setAudioStatus("🎧 Áudio ativado! ✅");
 
-        toneReverb = new Tone.Reverb({ decay: 3.5, wet: 0.35 }).toDestination();
-        toneChorus = new Tone.Chorus(4, 2.5, 0.03).connect(toneReverb).start();
+        toneReverb = new Tone.Reverb({ decay: 2.5, wet: 0.25 }).toDestination();
+        toneChorus = new Tone.Chorus(4, 2.5, 0.2).connect(toneReverb).start();
 
         synthCantus = new Tone.PolySynth(Tone.FMSynth, {
             harmonicity: 2, modulationIndex: 3,
@@ -706,7 +706,7 @@ async function playScoreTone(cantus, contraponto) {
                 const dur = durMap[n.duration] || 1;
                 if (n.note !== null) {
                     const noteName = Tone.Frequency(vexToMidi(n.note), "midi").toNote();
-                    synthCP.triggerAttackRelease(noteName, dur * 0.95, humanizeTime(now + tCP0), humanizeVelocity());
+                    synthCP.triggerAttackRelease(noteName, dur * 0.95, humanizeTime(now + tCP0), humanizeVelocity() * 0.9);
                 }
                 tCP0 += dur;
             });
@@ -3516,13 +3516,13 @@ function clearAllNotes() {
         if (q && q.tipo === 'c') drawScore(q.cantus, userContraponto, q.cantusPosition, q.cantusClef, q.contraClef);
     }
 }
-function showFeedback(message, isCorrect) {
+function showFeedback(message, isCorrect, ms = 3500) {
     const toast = document.createElement('div');
     toast.className = 'feedback-toast';
     toast.style.backgroundColor = isCorrect ? '#3a8b5a' : '#8b3a3a';
     toast.innerHTML = message;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3500);
+    setTimeout(() => toast.remove(), ms);
 }
 function showFeedbackPersistente(message, isCorrect) {
     document.querySelectorAll('.feedback-toast-persistente')
@@ -3746,11 +3746,82 @@ function renderCurrentQuestion() {
     
     refreshPianoHighlight();
 }
+// ── Classificações compatíveis ────────────────────────────────────────────
+// Algumas figuras satisfazem a definição de mais de um tratamento (ex.: nota de passagem
+// seguida de mais um passo na mesma direção também é um grupo de notas de passagem).
+// Para as questões de identificação (auditiva/análise), roda os validadores de todos os
+// tratamentos oferecidos sobre a partitura mostrada. Retorna [resposta, ...outros compatíveis].
+// Para evitar falsos positivos, só se consideram alternativas da MESMA família que a resposta:
+// vários validadores (ex.: formatos 5a/5b da 5ª espécie, "Sem Dissonâncias" da 2ª) são tolerantes
+// demais para serem usados como critério de classificação cruzada.
+const FAMILIAS_COMPATIVEIS = [
+    ['Nota de passagem', 'Bordadura', 'Cambiata', 'Bordadura dupla', 'Grupo de notas de passagem',
+     'Nota de passagem acentuada', 'Bordadura acentuada'],
+    ['Suspensão', 'Retardo', 'Suspensão com resolução interrompida', 'Retardo com resolução interrompida'],
+    ['Nota de passagem', 'Bordadura Inferior', 'Bordadura Superior']   // 2ª e 4ª espécies
+];
+function tratamentosCompativeis(q) {
+    if (q._compat) return q._compat;
+    const resposta = q.resposta;
+    const outros = [];
+    try {
+        const sp = currentSpecies;
+        const cantus = q.cantus || q.partitura?.cantus;
+        const cp = q.contraponto || q.partitura?.contraponto;
+        const pos = q.cantusPosition || q.partitura?.cantusPosition;
+        const cpAbaixo = (pos === 'superior');
+        const userCP = cp.map(n => ({ note: n.note, duration: n.duration }));
+        const d = userCP.map(n => n.duration), len = d.length;
+
+        // ritmo da figura (as questões de identificação não guardam o ritmo sorteado)
+        let rm = null;
+        if (sp === 3) {
+            if (len===5 && d[0]==='q' && d[1]==='q' && d[2]==='q' && d[3]==='q' && d[4]==='w') rm = 'a';
+            else if (len===6 && d[0]==='hr' && d[1]==='q' && d[2]==='q' && d[3]==='q' && d[4]==='q' && d[5]==='h') rm = 'b';
+            else if (len===5 && d[0]==='qr' && d[1]==='q' && d[2]==='q' && d[3]==='q' && d[4]==='w') rm = 'c';
+            else if (len===7 && d[0]==='qr' && d[1]==='q' && d[2]==='q' && d[3]==='q' && d[4]==='q' && d[5]==='q' && d[6]==='h') rm = 'd';
+        } else if (sp === 4) {
+            rm = cp._ritmoModelo || cantus._ritmoModelo4 || 'np';
+        } else if (sp === 5) {
+            rm = cp._ritmoModelo5 || cp._ritmoModelo || '5c';
+        }
+
+        for (const cand of tratamentosAtivos(sp)) {
+            if (cand === resposta) continue;
+            if (!FAMILIAS_COMPATIVEIS.some(f => f.includes(resposta) && f.includes(cand))) continue;
+            let r = null;
+            try {
+                if (sp === 2)      r = analisarContraponto2aEspecie(userCP, cantus, cand, cpAbaixo);
+                else if (sp === 3) { if (rm) r = analisarContraponto3aEspecie(userCP, cantus, cand, rm, cpAbaixo); }
+                else if (sp === 4) r = analisarContraponto4aEspecie(userCP, cantus, cand, rm, cpAbaixo);
+                else if (sp === 5) r = analisarContraponto5aEspecie(userCP, cantus, cand, rm, cpAbaixo);
+            } catch (e) { r = null; }   // validador não se aplica a esta figura
+            if (r && r.ok) outros.push(cand);
+        }
+    } catch (e) {
+        console.warn('tratamentosCompativeis falhou:', e);
+    }
+    // A NP e a Bordadura "simples" não verificam o tempo do compasso; se a versão acentuada
+    // também se aplica, a dissonância está no tempo forte e a versão simples não vale.
+    const final = [resposta, ...outros];
+    const semSimples = (acent, simples) =>
+        final.includes(acent) && simples !== resposta ? final.filter(t => t !== simples) : final;
+    let res = semSimples('Nota de passagem acentuada', 'Nota de passagem');
+    q._compat = ((l) => l.includes('Bordadura acentuada') && 'Bordadura' !== resposta ? l.filter(t => t !== 'Bordadura') : l)(res);
+    return q._compat;
+}
+
 function checkAnswer(choice, btn, q) {
     if (questionAnswered) return;
     
     questionAttempts[currentQuestionIndex] = 1;
-    const isCorrect = choice === q.resposta;
+    const compat = tratamentosCompativeis(q);
+    const isCorrect = compat.includes(choice);
+    const outrosAceitos = compat.filter(t => t !== choice);
+    const notaAlt = outrosAceitos.length
+        ? `<br><small>A figura também se enquadra como: ${outrosAceitos.map(t => `"${t}"`).join(', ')}.</small>`
+        : '';
+    const msDur = notaAlt ? 6000 : 3500;
     
     if (isCorrect) {
         const pontuacao = 1.0;
@@ -3766,10 +3837,10 @@ function checkAnswer(choice, btn, q) {
             const pts = Math.round((100 + bonus) * mult);
             desafioPontos += pts;
             atualizarHUD();
-            showFeedback(`✅ +${pts} pts${mult>1?' ×'+mult:''}`, true);
+            showFeedback(`✅ +${pts} pts${mult>1?' ×'+mult:''}${notaAlt}`, true, msDur);
         } else {
             const percentual = (pontuacao * 100).toFixed(0);
-            showFeedback(`✅ Correto! Pontuação: ${pontuacao.toFixed(0)} (${percentual}%)`, true);
+            showFeedback(`✅ Correto! Pontuação: ${pontuacao.toFixed(0)} (${percentual}%)${notaAlt}`, true, msDur);
         }
         
         if (currentModo !== 'desafio' && currentQuestionIndex === questions.length - 1) setTimeout(endExercise, 1200);
@@ -3782,10 +3853,10 @@ function checkAnswer(choice, btn, q) {
             desafioSequencia = 0;
             desafioVidas--;
             atualizarHUD();
-            showFeedback(`❌ Incorreto. Era: "${q.resposta}" (-1 vida)`, false);
+            showFeedback(`❌ Incorreto. Era: ${compat.map(t => `"${t}"`).join(' ou ')} (-1 vida)`, false, compat.length > 1 ? 6000 : 3500);
             if (desafioVidas <= 0) { setTimeout(() => reiniciarFaseDesafio(), 1500); return; }
         } else {
-            showFeedback(`❌ Incorreto. A resposta correta era: "${q.resposta}"`, false);
+            showFeedback(`❌ Incorreto. ${compat.length > 1 ? 'Respostas aceitas' : 'A resposta correta era'}: ${compat.map(t => `"${t}"`).join(' ou ')}`, false, compat.length > 1 ? 6000 : 3500);
         }
         
         btn.classList.add('wrong');
@@ -3794,7 +3865,7 @@ function checkAnswer(choice, btn, q) {
 
     document.querySelectorAll('.alt-btn').forEach(b => {
         b.disabled = true;
-        if (b.innerHTML === q.resposta) b.classList.add('correct');
+        if (compat.includes(b.innerHTML)) b.classList.add('correct');
     });
 
     if (q.tipo === 'a') {
