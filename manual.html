@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual do Usuário — Tratamentos de Dissonâncias</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; background:#1a1a1a; color:#e0e0e0; padding:30px 20px; }
+  .wrap { max-width:860px; margin:0 auto; }
+
+  h1 { font-size:2em; color:#e0e0e0; letter-spacing:2px; text-align:center; margin-bottom:4px; }
+  h1 span { color:#3a6ea5; }
+  .subtitle { text-align:center; color:#9a9a9a; font-style:italic; margin-bottom:32px; }
+
+  h2 { font-size:1.25em; color:#3a6ea5; border-left:4px solid #3a6ea5; padding-left:12px; margin:32px 0 14px; }
+  h3 { font-size:1.05em; color:#c0c0c0; margin:20px 0 8px; }
+
+  p  { color:#c8c8c8; line-height:1.7; margin-bottom:10px; }
+  ul, ol { padding-left:22px; margin-bottom:10px; }
+  li { color:#c8c8c8; line-height:1.75; }
+  li + li { margin-top:3px; }
+
+  /* Cards de modo */
+  .modes { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:16px 0 24px; }
+  .mode-card { background:#252525; border-radius:10px; padding:18px 16px; border-top:3px solid; }
+  .mode-card.estudo  { border-color:#4da87a; }
+  .mode-card.treino  { border-color:#3a6ea5; }
+  .mode-card.desafio { border-color:#c0872a; }
+  .mode-card h3 { margin-top:0; }
+  .mode-card.estudo  h3 { color:#4da87a; }
+  .mode-card.treino  h3 { color:#4d8bc9; }
+  .mode-card.desafio h3 { color:#c0872a; }
+
+  /* Tabelas */
+  table { width:100%; border-collapse:collapse; margin:12px 0 20px; font-size:14px; }
+  th { background:#1e3a5a; color:#9ac5f0; text-align:left; padding:8px 12px; }
+  td { padding:7px 12px; border-bottom:1px solid #333; color:#c8c8c8; vertical-align:top; }
+  tr:last-child td { border-bottom:none; }
+  tr:nth-child(even) td { background:#222; }
+
+  /* Notas de atenção */
+  .note { background:#1e2e1e; border-left:4px solid #4da87a; padding:10px 14px; border-radius:0 6px 6px 0; margin:12px 0; font-size:14px; color:#b0d0b0; }
+  .warn { background:#2e2010; border-left:4px solid #c0872a; padding:10px 14px; border-radius:0 6px 6px 0; margin:12px 0; font-size:14px; color:#d4b070; }
+
+  /* Atalhos */
+  kbd { background:#333; border:1px solid #555; border-radius:4px; padding:1px 7px; font-family:monospace; font-size:13px; color:#e0e0e0; }
+
+  /* Fases Desafio */
+  .fases { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin:12px 0 20px; }
+  .fase { background:#222; border-radius:7px; padding:10px 14px; font-size:13px; border-left:3px solid; }
+  .fase-analise { border-color:#4d8bc9; }
+  .fase-auditiva { border-color:#4da87a; }
+  .fase-escrita  { border-color:#c0872a; }
+  .fase .num { font-weight:bold; color:#9a9a9a; font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+  .fase .desc { color:#e0e0e0; margin-top:2px; }
+  .fase .timer { color:#9a9a9a; font-size:12px; margin-top:2px; }
+
+  /* Separador */
+  hr { border:none; border-top:1px solid #333; margin:28px 0; }
+
+  @media (max-width:600px) {
+    .modes { grid-template-columns:1fr; }
+    .fases  { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Exercícios de <span>Tratamento de Dissonâncias</span></h1>
+<p class="subtitle">Manual do Usuário · Prof. Rogério Tavares Constante · UFRJ / Polifonia</p>
+
+<hr>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>1. Visão geral</h2>
+
+<p>O programa gera e corrige exercícios de contraponto estrito nas espécies 2, 3, 4 e 5, cobrindo os principais tratamentos de dissonância. Há três modos de uso:</p>
+
+<div class="modes">
+  <div class="mode-card estudo">
+    <h3>📖 Estudo</h3>
+    <p>Você escolhe a espécie, o tratamento e o tipo de questão. Uma questão por vez, sem pressão de tempo. Indicado para aprender ou tirar dúvidas sobre um tratamento específico.</p>
+  </div>
+  <div class="mode-card treino">
+    <h3>🏋️ Treino</h3>
+    <p>Sessão configurável com múltiplas questões auditivas, de análise e de escrita. Ao final, gera um relatório PDF com desempenho por tipo de questão.</p>
+  </div>
+  <div class="mode-card desafio">
+    <h3>🏆 Desafio</h3>
+    <p>12 fases progressivas com timer, vidas e pontuação. Evolui da 2ª à 5ª espécie, da análise à escrita. Permite salvar e retomar o progresso.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>2. Configurações comuns</h2>
+
+<p>No topo da tela, antes de qualquer modo:</p>
+
+<ul>
+  <li><strong>Nome</strong> — obrigatório para iniciar qualquer atividade.</li>
+  <li><strong>Instrumento</strong> — timbre usado na reprodução do contraponto (Piano Real, Piano FM, Cordas, Synth).</li>
+  <li><strong>Áudio</strong> — o áudio é ativado automaticamente no primeiro clique em qualquer botão do programa.</li>
+</ul>
+
+<div class="note">A tonalidade é sorteada aleatoriamente a cada sessão iniciada. Ela aparece no painel do modo Treino após o início.</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>3. Tipos de questão</h2>
+
+<table>
+  <tr><th>Tipo</th><th>O que fazer</th><th>Como responder</th></tr>
+  <tr>
+    <td>🔊 <strong>Auditiva</strong></td>
+    <td>Ouça o contraponto clicando em <em>Ouvir</em> e identifique o tratamento de dissonância.</td>
+    <td>Selecione uma das alternativas exibidas. Após a resposta, a partitura é revelada para conferência visual.</td>
+  </tr>
+  <tr>
+    <td>👁️ <strong>Análise</strong></td>
+    <td>Observe a partitura e identifique o tratamento de dissonância. O contraponto é tocado automaticamente ao abrir a questão.</td>
+    <td>Selecione uma das alternativas.</td>
+  </tr>
+  <tr>
+    <td>✏️ <strong>Escrita</strong></td>
+    <td>Componha um contraponto para o cantus firmus exibido, usando o tratamento indicado no enunciado e a estrutura rítmica mostrada.</td>
+    <td>Use o teclado virtual e os botões de duração. Clique em <em>Validar</em> quando terminar.</td>
+  </tr>
+</table>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>4. Questões de escrita — como usar</h2>
+
+<h3>4.1 Inserindo notas</h3>
+<p>Selecione primeiro a duração desejada (botões acima do teclado ou atalhos de teclado), depois clique na tecla correspondente à nota. A nota é adicionada ao contraponto e a partitura é atualizada em tempo real.</p>
+
+<table>
+  <tr><th>Duração</th><th>Botão</th><th>Atalho</th></tr>
+  <tr><td>Semibreve</td><td>𝅜 Semibreve</td><td><kbd>1</kbd></td></tr>
+  <tr><td>Mínima</td><td>𝅗𝅥 Mínima</td><td><kbd>2</kbd></td></tr>
+  <tr><td>Mínima com ponto <em>(5ª esp.)</em></td><td>𝅗𝅥. Mínima com Ponto</td><td><kbd>3</kbd></td></tr>
+  <tr><td>Semínima</td><td>♩ Semínima</td><td><kbd>4</kbd></td></tr>
+  <tr><td>Colcheia</td><td>♪ Colcheia</td><td><kbd>8</kbd></td></tr>
+  <tr><td>Pausa de mínima <em>(3ª/4ª/5ª esp.)</em></td><td>𝄼 Pausa Mínima</td><td><kbd>R</kbd></td></tr>
+  <tr><td>Pausa de semínima <em>(3ª esp.)</em></td><td>𝄽 Pausa Semínima</td><td><kbd>Q</kbd></td></tr>
+</table>
+
+<div class="note">O teclado virtual exibe "C3 = dó central" para orientação de registro. As notas disponíveis são filtradas automaticamente de acordo com a tonalidade sorteada.</div>
+
+<h3>4.2 Corrigindo notas</h3>
+<ul>
+  <li>Clique em qualquer nota na lista <em>"Notas inseridas"</em> para removê-la individualmente.</li>
+  <li>Clique em <em>🗑️ Limpar todas</em> para recomeçar do zero.</li>
+</ul>
+
+<h3>4.3 Clave do contraponto</h3>
+<p>O programa define automaticamente a clave mais adequada para o contraponto. Se desejar alterar, clique nos botões <strong>𝄞 Sol</strong> ou <strong>𝄢 Fá</strong> que aparecem no enunciado da questão — a partitura é redesenhada imediatamente, sem apagar as notas inseridas.</p>
+
+<h3>4.4 Validação</h3>
+<p>Ao clicar em <em>Validar</em>, o programa verifica:</p>
+<ul>
+  <li>se o número de notas corresponde ao modelo rítmico sorteado;</li>
+  <li>se todas as notas pertencem à escala da tonalidade;</li>
+  <li>se as regras do tratamento foram respeitadas (consonâncias nos tempos fortes, dissonâncias corretamente preparadas e resolvidas, direção melódica, cruzamentos de voz etc.).</li>
+</ul>
+<p>Em caso de erro, a mensagem indica o problema específico e o aluno pode tentar novamente. Cada tentativa reduz a pontuação da questão.</p>
+
+<div class="warn">Atenção: o número de notas deve corresponder exatamente ao modelo rítmico indicado no enunciado. Por exemplo, para o modelo ♩♩♩♩ | 𝅜 (modelo a), são necessárias exatamente 5 notas.</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>5. Espécies e tratamentos</h2>
+
+<table>
+  <tr><th>Espécie</th><th>Tratamentos</th></tr>
+  <tr>
+    <td><strong>2ª</strong></td>
+    <td>Nota de passagem · Bordadura Inferior · Bordadura Superior · Sem dissonâncias</td>
+  </tr>
+  <tr>
+    <td><strong>3ª</strong></td>
+    <td>Nota de passagem · Bordadura · Cambiata · Bordadura dupla · Grupo de notas de passagem · Nota de passagem acentuada · Bordadura acentuada</td>
+  </tr>
+  <tr>
+    <td><strong>4ª</strong></td>
+    <td>Suspensão · Retardo · Nota de passagem · Bordadura Superior · Bordadura Inferior</td>
+  </tr>
+  <tr>
+    <td><strong>5ª</strong></td>
+    <td>Todos os da 3ª e 4ª espécies, mais: Suspensão com resolução interrompida · Retardo com resolução interrompida · Apojatura · Antecipação · Escapada</td>
+  </tr>
+</table>
+
+<p>Na 3ª espécie, o programa sorteias diferentes modelos rítmicos (estruturas que combinam pausas e notas de passagem em distintas posições métricas). Na 5ª espécie, os modelos rítmicos são mais variados — o enunciado sempre exibe o modelo sorteado com símbolos de duração.</p>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>6. Modo Estudo</h2>
+
+<ol>
+  <li>Digite seu nome no campo <em>Nome</em>.</li>
+  <li>Selecione a <strong>Espécie</strong>.</li>
+  <li>Selecione o <strong>Tratamento</strong> — a lista atualiza automaticamente conforme a espécie.</li>
+  <li>Selecione o <strong>Tipo de questão</strong> (Auditiva, Análise ou Escrita).</li>
+  <li>Clique em <strong>▶ Gerar questão</strong>.</li>
+</ol>
+
+<p>Após responder, clique em <em>⏩ Próxima</em> para gerar outra questão com os mesmos parâmetros. Altere os parâmetros a qualquer momento para explorar outros tratamentos.</p>
+
+<div class="note">Não há pontuação nem limite de tempo no modo Estudo. Use-o para aprender o comportamento de cada tratamento antes de avançar para o Treino ou o Desafio.</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>7. Modo Treino</h2>
+
+<ol>
+  <li>Digite seu nome.</li>
+  <li>Selecione a <strong>Espécie</strong>.</li>
+  <li>Configure a quantidade de questões por tipo (3 ou 5 de cada).</li>
+  <li>Clique em <strong>▶ INICIAR TREINO</strong>.</li>
+</ol>
+
+<p>As questões são apresentadas em sequência: primeiro as auditivas, depois as de análise e por fim as de escrita. Após todas as questões, clique em <strong>📊 RELATÓRIO PDF</strong> para exportar o resultado.</p>
+
+<p>O relatório contém: nome, data, tonalidade, espécie, desempenho por tipo de questão e pontuação total.</p>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>8. Modo Desafio</h2>
+
+<h3>8.1 Estrutura das fases</h3>
+
+<div class="fases">
+  <div class="fase fase-analise"><div class="num">Fase 1</div><div class="desc">2ª esp. — Análise (3 questões)</div><div class="timer">⏱ 60s</div></div>
+  <div class="fase fase-auditiva"><div class="num">Fase 2</div><div class="desc">2ª esp. — Auditiva (3 questões)</div><div class="timer">⏱ 45s</div></div>
+  <div class="fase fase-analise"><div class="num">Fase 3</div><div class="desc">4ª esp. — Análise (3 questões)</div><div class="timer">⏱ 60s</div></div>
+  <div class="fase fase-auditiva"><div class="num">Fase 4</div><div class="desc">4ª esp. — Auditiva (3 questões)</div><div class="timer">⏱ 50s</div></div>
+  <div class="fase fase-analise"><div class="num">Fase 5</div><div class="desc">3ª esp. — Análise (3 questões)</div><div class="timer">⏱ 60s</div></div>
+  <div class="fase fase-auditiva"><div class="num">Fase 6</div><div class="desc">3ª esp. — Auditiva (3 questões)</div><div class="timer">⏱ 45s</div></div>
+  <div class="fase fase-escrita"><div class="num">Fase 7</div><div class="desc">2ª/4ª esp. — Escrita (5 questões)</div><div class="timer">⏱ 120s</div></div>
+  <div class="fase fase-escrita"><div class="num">Fase 8</div><div class="desc">3ª esp. — Escrita (5 questões)</div><div class="timer">⏱ 150s</div></div>
+  <div class="fase fase-analise"><div class="num">Fase 9</div><div class="desc">5ª esp. — Análise (3 questões)</div><div class="timer">⏱ 60s</div></div>
+  <div class="fase fase-auditiva"><div class="num">Fase 10</div><div class="desc">5ª esp. — Auditiva (3 questões)</div><div class="timer">⏱ 50s</div></div>
+  <div class="fase fase-escrita"><div class="num">Fase 11</div><div class="desc">5ª esp. — Escrita (5 questões)</div><div class="timer">⏱ 180s</div></div>
+  <div class="fase fase-auditiva"><div class="num">Fase 12</div><div class="desc">Mista — Desafio final (5 questões)</div><div class="timer">⏱ 40s</div></div>
+</div>
+
+<h3>8.2 Mecânicas</h3>
+
+<table>
+  <tr><th>Elemento</th><th>Funcionamento</th></tr>
+  <tr><td>❤️ Vidas</td><td>Cada fase começa com 3 vidas. Um erro em questão de múltipla escolha ou uma resposta inválida repetida no Desafio desconta uma vida. Sem vidas: a fase reinicia.</td></tr>
+  <tr><td>⏱ Timer</td><td>Conta regressiva por fase. A barra fica vermelha nos últimos 10 segundos. Tempo esgotado: desconta uma vida e avança.</td></tr>
+  <tr><td>🏅 Pontuação</td><td>100 pts por acerto + bônus de velocidade (até 50 pts pelo tempo restante) × multiplicador de sequência.</td></tr>
+  <tr><td>🔥 Sequência</td><td>Acertos consecutivos aplicam multiplicador: ×1,5 a partir do 3º acerto seguido; ×2 a partir do 5º. Qualquer erro zera a sequência.</td></tr>
+  <tr><td>🏆 Emblemas</td><td>Conquistados por desempenho: acerto perfeito em uma fase, sequência de 5, invicto nas 6 primeiras fases.</td></tr>
+</table>
+
+<h3>8.3 Pausa</h3>
+<p>Clique em <strong>⏸ Pausar</strong> para interromper o timer. A pausa só é efetiva entre questões. Se você tentar pausar durante uma questão de escrita com notas já inseridas, o programa alertará que a resposta será anulada — você pode confirmar ou continuar sem pausar.</p>
+
+<h3>8.4 Salvar e retomar</h3>
+<p>Clique em <strong>💾 Salvar</strong> durante o Desafio para exibir o <em>código de retomada</em> — uma sequência alfanumérica curta. Copie e guarde este código. Para retomar, cole-o no campo <em>"Retomar sessão"</em> na tela inicial do Desafio e clique em <strong>↩ Retomar</strong>.</p>
+
+<div class="note">O código salva: fase, vidas, pontuação, sequência e emblemas conquistados. As questões são regeneradas — o histórico de respostas anteriores não é recuperado.</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>9. Navegação entre questões</h2>
+
+<ul>
+  <li>Após responder corretamente, clique em <strong>⏩ Próxima</strong> para avançar.</li>
+  <li>No modo Treino, ao concluir todas as questões, o botão de relatório é habilitado.</li>
+  <li>No modo Desafio, a progressão entre questões e fases é automática após cada resposta.</li>
+</ul>
+
+<!-- ══════════════════════════════════════════════ -->
+<h2>10. Perguntas frequentes</h2>
+
+<h3>O áudio não está tocando.</h3>
+<p>Clique em qualquer botão da interface — o áudio precisa de uma interação do usuário para ser ativado pelo navegador. O indicador no topo mudará para verde quando estiver pronto.</p>
+
+<h3>A validação rejeita meu contraponto com "número de notas incorreto".</h3>
+<p>O modelo rítmico está indicado no enunciado com símbolos de duração. Conte as durações do modelo e insira exatamente esse número de notas. Por exemplo, 𝅗𝅥. ♩ | 𝅜 corresponde a 3 notas (mínima com ponto + semínima + semibreve).</p>
+
+<h3>Posso usar o programa em dispositivos móveis?</h3>
+<p>Sim. O layout é responsivo. Em telas pequenas, o teclado virtual e os painéis se ajustam automaticamente. Para inserir notas, toque nas teclas do piano virtual.</p>
+
+<h3>Como interpretar a partitura?</h3>
+<p>A pauta superior exibe o cantus firmus quando o contraponto é a voz grave; a pauta inferior, quando o contraponto é a voz aguda. O programa define automaticamente a clave mais conveniente, mas você pode alterá-la com os botões 𝄞 Sol / 𝄢 Fá no enunciado.</p>
+
+<hr>
+<p style="text-align:center; color:#555; font-size:13px;">
+  Exercícios de Tratamento de Dissonâncias · UFRJ / Projeto Polifonia<br>
+  Prof. Rogério Tavares Constante &mdash; rogerio@musica.ufrj.br
+</p>
+
+</div>
+</body>
+</html>
