@@ -1,5 +1,6 @@
 #!/bin/bash
 # ---------------------------------------------------------------
+# Exercícios de Tratamentos de Dissonância — Copyright (C) 2026 Rogério Tavares Constante (GPL-3.0)
 # iniciar-servidor.sh
 # Sobe um servidor Python (http.server) na pasta onde este script
 # está e abre a página do projeto no navegador padrão. Se o servidor

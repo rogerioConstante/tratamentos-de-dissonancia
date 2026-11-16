@@ -1,5 +1,6 @@
 #!/bin/bash
 # ---------------------------------------------------------------
+# Exercícios de Tratamentos de Dissonância — Copyright (C) 2026 Rogério Tavares Constante (GPL-3.0)
 # parar-servidor.sh
 # Para o servidor Python que estiver rodando na porta informada
 # (padrão: 8080). Dá para usar por duplo clique ou pelo terminal.
